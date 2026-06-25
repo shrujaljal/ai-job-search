@@ -76,6 +76,13 @@ This repo is a job application workspace. Claude acts as a career advisor and ap
 - [DEALBREAKER_1]
 - [DEALBREAKER_2]
 
+## Git Workflow
+- Always pull latest changes at the start of a session
+- After any file modifications, stage all changes with `git add .`
+- Write descriptive commit messages summarizing what changed and why
+- Push to origin master after every commit
+- Use `gh` for pull requests when working on feature branches
+
 ## Repo Structure
 - `cv/` - LaTeX CV variants (moderncv template, banking style)
 - `cover_letters/` - LaTeX cover letters (custom cover.cls template)
