@@ -330,17 +330,20 @@ with tab_search:
 
             st.subheader("Tailored Resumes")
             for r in results:
+                company = r.get("company", "")
+                role = r.get("role", "")
                 if r.get("blocked"):
-                    st.error(f"⛔ **{r['company']} — {r['role']}**: skipped — "
-                             f"no sponsorship for F1 ({r['block_reason']}). "
+                    st.error(f"⛔ **{company} — {role}**: skipped — "
+                             f"no sponsorship for F1 ({r.get('block_reason', '')}). "
                              "Verify in the posting before ruling it out.")
-                elif r["ok"]:
-                    with st.expander(f"✅ {r['company']} — {r['role']}  ·  {r['family']}"):
-                        st.write(f"**Role family detected:** {r['family']}")
-                        st.write(f"**Saved to:** `{r['out_dir']}`")
+                elif r.get("ok"):
+                    out_dir = r.get("out_dir") or str(Path(r["resume_path"]).parent)
+                    with st.expander(f"✅ {company} — {role}  ·  {r.get('family', '')}"):
+                        st.write(f"**Role family detected:** {r.get('family', '')}")
+                        st.write(f"**Saved to:** `{out_dir}`")
                         if r.get("exp_warning"):
                             st.warning("⚠️ " + r["exp_warning"])
-                        if r["warnings"]:
+                        if r.get("warnings"):
                             st.caption("Content trimmed to fit 1 page: "
                                        + "; ".join(r["warnings"]))
                         if r.get("pdf_error"):
@@ -368,16 +371,16 @@ with tab_search:
                         if st.button("Add to Tracker", key=f"trk_{r['resume_path']}"):
                             rows = load_tracker()
                             rows.append({
-                                "company": r["company"], "role": r["role"],
+                                "company": company, "role": role,
                                 "location": "", "url": "",
                                 "date_added": str(date.today()),
                                 "status": "To Apply",
-                                "notes": f"Resume tailored ({r['family']})",
+                                "notes": f"Resume tailored ({r.get('family', '')})",
                             })
                             save_tracker(rows)
                             st.success("Added to tracker.")
                 else:
-                    st.error(f"❌ {r['company']} — {r['role']}: {r['error']}")
+                    st.error(f"❌ {company} — {role}: {r.get('error', 'unknown error')}")
 
 # ════════════════════════════════════════════════════════════════════════════
 # TAB 2 — TRACKER
