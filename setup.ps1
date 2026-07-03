@@ -8,8 +8,8 @@ $root = $PSScriptRoot
 Write-Host "=== Job Search Assistant Setup ===" -ForegroundColor Cyan
 
 # --- 1. Python packages ------------------------------------------------------
-Write-Host "`n[1/2] Installing Python packages (streamlit, python-docx, lxml)..." -ForegroundColor Yellow
-python -m pip install --quiet python-docx streamlit lxml
+Write-Host "`n[1/2] Installing Python packages (streamlit, python-docx, lxml, pywin32)..." -ForegroundColor Yellow
+python -m pip install --quiet python-docx streamlit lxml pywin32
 if ($LASTEXITCODE -eq 0) {
     Write-Host "  Python packages installed." -ForegroundColor Green
 } else {
