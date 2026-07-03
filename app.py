@@ -2,23 +2,21 @@
 Job Search Assistant — local Streamlit UI.
 
 Tabs:
-  1. Search    — scrape LinkedIn / Indeed / Glassdoor
-  2. Analyze   — paste a JD, get fit score + tailoring notes
-  3. Resume    — generate & download tailored .docx
-  4. Tracker   — track application status
+  1. Search & Tailor — scrape all job boards, score each job against the profile,
+     queue jobs, and generate tailored resumes.
+  2. Tracker         — track application status.
 """
 
 import json
 import subprocess
-import tempfile
 from datetime import date
 from pathlib import Path
 
+import pandas as pd
 import streamlit as st
 
-from resume_engine import (
-    ResumeData, ExperienceEntry, ProjectEntry, SkillCategory, generate
-)
+from fit import score_job
+from tailoring import tailor_job
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).parent
@@ -27,9 +25,11 @@ CLI_ROOTS = {
     "Indeed":    ROOT / ".agents/skills/indeed-search/cli",
     "Glassdoor": ROOT / ".agents/skills/glassdoor-search/cli",
 }
+ALL_BOARDS = list(CLI_ROOTS.keys())
 TRACKER_FILE = ROOT / "output" / "tracker.json"
 OUTPUT_DIR = ROOT / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
+
 
 # ── Tracker persistence ───────────────────────────────────────────────────────
 def load_tracker() -> list[dict]:
@@ -37,410 +37,234 @@ def load_tracker() -> list[dict]:
         return json.loads(TRACKER_FILE.read_text())
     return []
 
+
 def save_tracker(rows: list[dict]) -> None:
     TRACKER_FILE.write_text(json.dumps(rows, indent=2))
 
-# ── Scraper helper ────────────────────────────────────────────────────────────
-def run_scraper(board: str, query: str, location: str,
-                date_posted: str, job_type: str, limit: int) -> list[dict]:
+
+# ── Scraper ───────────────────────────────────────────────────────────────────
+def scrape_board(board: str, query: str, location: str, date_posted: str,
+                 job_type: str, pages: int) -> list[dict]:
+    """Scrape one board across N pages. Returns list of job dicts (board tagged)."""
     cli_dir = CLI_ROOTS[board]
-    cmd = ["bun", "run", "src/cli.ts", "search",
-           "--query", query,
-           "--format", "json",
-           "--limit", str(limit)]
-    if location:
-        cmd += ["--location", location]
-    if date_posted != "any":
-        cmd += ["--datePosted", date_posted]
-    if job_type != "any":
-        cmd += ["--jobType", job_type]
-
-    try:
-        result = subprocess.run(
-            cmd, cwd=str(cli_dir), capture_output=True, text=True, timeout=30
-        )
-        if result.returncode != 0:
-            st.error(f"Scraper error: {result.stderr[:400]}")
-            return []
-        raw = result.stdout.strip()
-        if not raw:
-            return []
-        data = json.loads(raw)
-        # All three scrapers return {"meta": {...}, "results": [...]}
-        if isinstance(data, dict):
-            return data.get("results") or data.get("jobs") or []
-        if isinstance(data, list):
-            return data
-        return []
-    except subprocess.TimeoutExpired:
-        st.error("Scraper timed out (30s). Try a narrower search.")
-        return []
-    except json.JSONDecodeError as e:
-        st.error(f"Could not parse scraper output: {e}")
-        return []
-
-# ── Default resume data (used as base for all tailoring) ─────────────────────
-def default_resume() -> ResumeData:
-    return ResumeData(
-        summary=(
-            "MBA graduate from UC Riverside (GPA 3.8) with 3+ years of experience across "
-            "strategy, analytics, and operations within Fortune 500 organizations and startup "
-            "environments. Skilled at translating ambiguous business problems into fact-based "
-            "analysis, SQL-driven reporting, and executive-ready recommendations. Proven track "
-            "record partnering cross-functionally with finance, operations, and marketing "
-            "stakeholders to standardize KPIs and drive measurable business performance."
-        ),
-        experiences=[
-            ExperienceEntry(
-                company="BB Wellness", role="Analyst Intern",
-                date="Feb 2025 – Sep 2025",
-                bullets=[
-                    "Defined go-to-market problem scope through market segmentation and "
-                    "competitive benchmarking across 6 competitors, translating research into "
-                    "fact-based product positioning recommendations for leadership.",
-                    "Built SQL-driven KPI dashboards spanning 4 channels, establishing a "
-                    "centralized reporting framework that surfaced performance gaps and enabled "
-                    "leadership to prioritize strategic initiatives.",
-                    "Developed hypothesis-driven business cases and strategic roadmaps, "
-                    "partnering with marketing, content, and operations stakeholders to align "
-                    "10+ cross-functional initiatives against weekly OKRs.",
-                ],
-            ),
-            ExperienceEntry(
-                company="Thomson Reuters", role="Analyst – Global Operations",
-                date="Oct 2023 – Jun 2024",
-                bullets=[
-                    "Built 15+ SQL and Excel reporting frameworks adopted across 3 global "
-                    "business units, reducing manual reporting effort ~30% and improving "
-                    "executive visibility into business performance.",
-                    "Partnered with finance, procurement, and operations stakeholders across "
-                    "4 regions to standardize KPIs and support Quarterly Business Reviews, "
-                    "budgeting, and annual business planning.",
-                    "Prepared executive summaries translating complex, multi-source analyses "
-                    "into structured business recommendations for senior leadership.",
-                ],
-            ),
-            ExperienceEntry(
-                company="Goldman Sachs", role="STEM Intern – Asset & Wealth Management",
-                date="Feb 2023 – Jun 2023",
-                bullets=[
-                    "Built Qlik Sense dashboards consolidating 5+ operational data sources, "
-                    "improving executive visibility into business performance across AWM.",
-                    "Identified process gaps through workflow analysis using Excel, JIRA, and "
-                    "Qlik Sense, strengthening compliance reporting and operational controls.",
-                    "Developed operational trackers monitoring hundreds of client commitments, "
-                    "improving workflow transparency and cross-team reporting consistency.",
-                ],
-            ),
-            ExperienceEntry(
-                company="Beyond Key", role="Data Analyst Intern",
-                date="Jun 2022 – Aug 2022",
-                bullets=[
-                    "Analyzed business datasets using SQL, Python, and Excel; built Tableau "
-                    "dashboards enabling real-time performance monitoring for healthcare clients.",
-                ],
-            ),
-        ],
-        coursework="Business Analytics & Reporting, Operations Management, Quantitative Analysis",
-        projects=[
-            ProjectEntry(
-                title="Hyundai Rotem Operations Consulting Project",
-                bullets=[
-                    "Led a strategy consulting engagement analyzing manufacturing operations, "
-                    "inventory flows, and capacity constraints through process mapping and "
-                    "stakeholder interviews.",
-                    "Developed phased operational roadmaps, KPI frameworks, and executive "
-                    "recommendations improving scalability and operational efficiency.",
-                ],
+    jobs = []
+    for page in range(1, pages + 1):
+        cmd = ["bun", "run", "src/cli.ts", "search",
+               "--query", query, "--format", "json", "--page", str(page)]
+        if location:
+            cmd += ["--location", location]
+        if date_posted != "any":
+            cmd += ["--datePosted", date_posted]
+        if job_type != "any":
+            cmd += ["--jobType", job_type]
+        try:
+            result = subprocess.run(
+                cmd, cwd=str(cli_dir), capture_output=True, text=True, timeout=40
             )
-        ],
-        leadership_bullets=[
-            "Launched the school's first newsletter and podcast, designing editorial strategy, "
-            "distribution workflows, and performance dashboards that improved audience engagement.",
-        ],
-        skills=[
-            SkillCategory("Business Strategy",
-                "Business Strategy, Strategic Planning, Annual Business Planning, "
-                "Business Case Development, Market Research, Stakeholder Management"),
-            SkillCategory("Analytics & Reporting",
-                "SQL, Python, Advanced Excel (Pivot Tables, XLOOKUP, Power Query), "
-                "Tableau, Qlik Sense, KPI Reporting, Data Visualization"),
-            SkillCategory("Operations & Execution",
-                "Cross-Functional Leadership, Program Management, Process Improvement, "
-                "Operational Excellence, OKR Design & Tracking, Change Management"),
-            SkillCategory("Tools & AI",
-                "ChatGPT, Claude, Gemini, Excel Copilot, n8n, Salesforce, "
-                "SAP Ariba, JIRA, HubSpot, PowerPoint"),
-        ],
-    )
+            if result.returncode != 0:
+                st.warning(f"{board} p{page}: {result.stderr[:150]}")
+                break
+            raw = result.stdout.strip()
+            if not raw:
+                break
+            data = json.loads(raw)
+            results = data.get("results") if isinstance(data, dict) else data
+            if not results:
+                break
+            for j in results:
+                j["board"] = board
+            jobs += results
+        except subprocess.TimeoutExpired:
+            st.warning(f"{board} p{page} timed out.")
+            break
+        except json.JSONDecodeError:
+            st.warning(f"{board} p{page}: could not parse output.")
+            break
+    return jobs
+
+
+def run_search(boards: list[str], query: str, location: str, date_posted: str,
+               job_type: str, pages: int) -> list[dict]:
+    """Scrape selected boards, score, dedupe, sort by fit score."""
+    all_jobs = []
+    seen = set()
+    progress = st.progress(0.0, text="Starting…")
+    for i, board in enumerate(boards):
+        progress.progress(i / len(boards), text=f"Searching {board}…")
+        for job in scrape_board(board, query, location, date_posted, job_type, pages):
+            title = job.get("title", "")
+            company = job.get("company", "")
+            key = (title.lower().strip(), company.lower().strip())
+            if key in seen or not title:
+                continue
+            seen.add(key)
+            loc = job.get("location", "")
+            fit = score_job(title, company, loc)
+            job.update({
+                "score": fit["score"], "tier": fit["tier"],
+                "family": fit["family"], "reason": fit["reason"],
+            })
+            all_jobs.append(job)
+    progress.progress(1.0, text="Done.")
+    progress.empty()
+    all_jobs.sort(key=lambda j: j["score"], reverse=True)
+    return all_jobs
+
 
 # ════════════════════════════════════════════════════════════════════════════
-# Page config
-# ════════════════════════════════════════════════════════════════════════════
-st.set_page_config(
-    page_title="Job Search Assistant",
-    page_icon="💼",
-    layout="wide",
-)
-
+st.set_page_config(page_title="Job Search Assistant", page_icon="💼", layout="wide")
 st.title("💼 Job Search Assistant")
 st.caption("Shrujal Agarwal — local workflow tool")
 
-tab_search, tab_analyze, tab_resume, tab_tracker = st.tabs(
-    ["🔍 Search", "📋 Analyze JD", "📄 Resume", "📊 Tracker"]
-)
+tab_search, tab_tracker = st.tabs(["🔍 Search & Tailor", "📊 Tracker"])
 
 # ════════════════════════════════════════════════════════════════════════════
-# TAB 1 — SEARCH
+# TAB 1 — SEARCH & TAILOR
 # ════════════════════════════════════════════════════════════════════════════
 with tab_search:
     st.header("Job Board Search")
 
-    col1, col2 = st.columns(2)
-    with col1:
+    c1, c2 = st.columns(2)
+    with c1:
         query = st.text_input("Role / Keywords", placeholder="Strategy & Operations Analyst")
         location = st.text_input("Location", placeholder="California, USA")
-    with col2:
-        board = st.selectbox("Job Board", ["LinkedIn", "Indeed", "Glassdoor"])
-        date_posted = st.selectbox("Date Posted", ["any", "day", "week", "month"],
-                                   format_func=lambda x: {"any": "Any time", "day": "Past 24h",
-                                                           "week": "Past week",
-                                                           "month": "Past month"}[x])
-    col3, col4 = st.columns(2)
-    with col3:
-        job_type = st.selectbox("Job Type", ["any", "fulltime", "internship", "contract"],
-                                format_func=lambda x: x.title() if x != "any" else "Any")
-    with col4:
-        limit = st.number_input("Max results", min_value=5, max_value=50, value=15)
+    with c2:
+        board_choice = st.selectbox("Job Board", ["All Boards"] + ALL_BOARDS)
+        date_posted = st.selectbox(
+            "Date Posted", ["any", "day", "week", "month"],
+            format_func=lambda x: {"any": "Any time", "day": "Past 24h",
+                                   "week": "Past week", "month": "Past month"}[x])
+
+    c3, c4 = st.columns(2)
+    with c3:
+        job_type = st.selectbox(
+            "Job Type", ["any", "fulltime", "internship", "contract"],
+            format_func=lambda x: x.title() if x != "any" else "Any")
+    with c4:
+        pages = st.number_input("Pages per board", min_value=1, max_value=5, value=2,
+                                help="More pages = more jobs (slower). "
+                                     "LinkedIn ~25/pg, Glassdoor ~30/pg, Indeed ~10/pg.")
 
     if st.button("Search Jobs", type="primary"):
         if not query:
             st.warning("Enter a role or keywords to search.")
         else:
-            with st.spinner(f"Searching {board}…"):
-                jobs = run_scraper(board, query, location, date_posted, job_type, int(limit))
-
+            boards = ALL_BOARDS if board_choice == "All Boards" else [board_choice]
+            with st.spinner("Scraping and scoring…"):
+                jobs = run_search(boards, query, location, date_posted,
+                                  job_type, int(pages))
             if jobs:
-                st.success(f"Found {len(jobs)} results from {board}.")
-                st.session_state["search_results"] = jobs
-                st.session_state["search_board"] = board
+                st.session_state["jobs"] = jobs
+                st.success(f"Found {len(jobs)} unique jobs across {len(boards)} board(s), "
+                           "sorted by fit score.")
             else:
-                st.info("No results returned. Try different keywords or board.")
+                st.info("No results. Try different keywords or boards.")
 
-    if "search_results" in st.session_state:
-        jobs = st.session_state["search_results"]
-        board_label = st.session_state.get("search_board", "")
-        st.subheader(f"Results — {board_label}")
+    # ── Results table with fit scores + queue checkboxes ─────────────────────
+    if "jobs" in st.session_state and st.session_state["jobs"]:
+        jobs = st.session_state["jobs"]
+        st.subheader("Results")
+        st.caption("Tick **Queue** for jobs you want tailored resumes for, then click "
+                   "**Tailor Selected Resumes**. Sorted by fit score (best first).")
 
-        for i, job in enumerate(jobs):
-            title = job.get("title") or job.get("jobTitle") or "Untitled"
-            company = job.get("company") or job.get("companyName") or ""
-            loc = job.get("location") or ""
-            url = job.get("url") or job.get("jobUrl") or job.get("link") or "#"
-            posted = job.get("date") or job.get("postedAt") or job.get("datePosted") or ""
+        df = pd.DataFrame([{
+            "Queue": False,
+            "Score": j["score"],
+            "Tier": j["tier"],
+            "Title": j.get("title", ""),
+            "Company": j.get("company", ""),
+            "Location": j.get("location", ""),
+            "Why this score": j["reason"],
+            "Board": j.get("board", ""),
+            "Link": j.get("url", ""),
+        } for j in jobs])
 
-            with st.expander(f"{title} — {company}"):
-                cols = st.columns([3, 1])
-                with cols[0]:
-                    st.write(f"**Location:** {loc}")
-                    if posted:
-                        st.write(f"**Posted:** {posted}")
-                    if url and url != "#":
-                        st.markdown(f"[Open Job Posting]({url})")
-                with cols[1]:
-                    if st.button("Add to Tracker", key=f"add_{i}"):
-                        rows = load_tracker()
-                        rows.append({
-                            "company": company,
-                            "role": title,
-                            "location": loc,
-                            "url": url,
-                            "date_added": str(date.today()),
-                            "status": "To Apply",
-                            "notes": "",
-                        })
-                        save_tracker(rows)
-                        st.success("Added to tracker.")
+        edited = st.data_editor(
+            df,
+            hide_index=True,
+            use_container_width=True,
+            height=480,
+            column_config={
+                "Queue": st.column_config.CheckboxColumn("Queue", width="small"),
+                "Score": st.column_config.ProgressColumn(
+                    "Fit", min_value=0, max_value=100, format="%d"),
+                "Tier": st.column_config.TextColumn("Tier", width="small"),
+                "Title": st.column_config.TextColumn("Title", width="medium"),
+                "Company": st.column_config.TextColumn("Company", width="small"),
+                "Location": st.column_config.TextColumn("Location", width="small"),
+                "Why this score": st.column_config.TextColumn(
+                    "Why this score", width="large"),
+                "Board": st.column_config.TextColumn("Board", width="small"),
+                "Link": st.column_config.LinkColumn("Link", display_text="Open", width="small"),
+            },
+            disabled=["Score", "Tier", "Title", "Company", "Location",
+                      "Why this score", "Board", "Link"],
+            key="results_editor",
+        )
 
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 2 — ANALYZE JD
-# ════════════════════════════════════════════════════════════════════════════
-with tab_analyze:
-    st.header("Analyze a Job Description")
-    st.caption("Paste the full JD. The tool will identify role family, fit, and tailoring notes.")
+        queued_idx = edited.index[edited["Queue"]].tolist()
+        n_queued = len(queued_idx)
 
-    jd_text = st.text_area("Job Description", height=300,
-                            placeholder="Paste the full job description here…")
+        col_a, col_b = st.columns([1, 3])
+        with col_a:
+            tailor_clicked = st.button(
+                f"🎯 Tailor Selected Resumes ({n_queued})",
+                type="primary", disabled=(n_queued == 0))
+        with col_b:
+            if n_queued:
+                st.caption(f"{n_queued} job(s) queued for tailoring.")
 
-    if st.button("Analyze", type="primary"):
-        if not jd_text.strip():
-            st.warning("Paste a job description first.")
-        else:
-            # Rule-based analysis (no API call needed)
-            jd_lower = jd_text.lower()
+        if tailor_clicked and n_queued:
+            results = []
+            prog = st.progress(0.0, text="Tailoring…")
+            for k, idx in enumerate(queued_idx):
+                job = jobs[idx]
+                prog.progress(k / n_queued,
+                              text=f"Tailoring: {job.get('title', '')[:40]}…")
+                results.append(tailor_job(job))
+            prog.progress(1.0, text="Done.")
+            prog.empty()
 
-            # Role family detection
-            role_keywords = {
-                "Strategy & Operations": ["strategy", "operations", "s&o", "planning", "intelligence"],
-                "Business Analyst":      ["business analyst", "data analyst", "reporting", "dashboards", "sql"],
-                "Program Management":    ["program manager", "project manager", "pmo", "roadmap"],
-                "Marketing Operations":  ["marketing operations", "campaign", "go-to-market", "gtm"],
-                "Product Marketing":     ["product marketing", "positioning", "messaging", "pmm"],
-                "Consulting":            ["consulting", "consultant", "advisory", "client engagement"],
-            }
-            scores = {family: sum(1 for kw in kws if kw in jd_lower)
-                      for family, kws in role_keywords.items()}
-            best_family = max(scores, key=scores.get)
-
-            # Skills match
-            candidate_skills = [
-                "sql", "excel", "tableau", "python", "qlik", "sap ariba", "jira",
-                "kpi", "reporting", "dashboard", "operations", "strategy", "stakeholder",
-                "cross-functional", "process improvement", "market research",
-                "competitive analysis", "program management", "business analytics",
-                "forecasting", "budgeting", "okr", "powerpoint"
-            ]
-            matched = [s for s in candidate_skills if s in jd_lower]
-            total_skills = len(candidate_skills)
-            fit_pct = round(len(matched) / total_skills * 100)
-
-            # Visa / sponsorship flag
-            no_sponsor_phrases = ["must be authorized", "no sponsorship", "citizens only",
-                                   "permanent resident", "green card", "us citizen"]
-            visa_risk = any(p in jd_lower for p in no_sponsor_phrases)
-
-            # Output
-            st.subheader("Analysis")
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Role Family", best_family)
-            c2.metric("Skills Match", f"{fit_pct}%")
-            c3.metric("Visa Risk", "⚠️ High" if visa_risk else "✅ Low")
-
-            st.subheader("Matched Skills")
-            if matched:
-                st.write(", ".join(f"`{s}`" for s in matched))
-            else:
-                st.write("No direct skill matches found.")
-
-            st.subheader("Tailoring Notes")
-            family_notes = {
-                "Strategy & Operations": (
-                    "Lead with Thomson Reuters and Goldman Sachs. "
-                    "Emphasize KPI reporting, cross-functional execution, and business planning. "
-                    "Include Hyundai Rotem project. Summary: strategy + analytics + operations."
-                ),
-                "Business Analyst": (
-                    "Lead with Thomson Reuters + Beyond Key. "
-                    "Emphasize SQL, Tableau, dashboards, trend analysis. "
-                    "Include Hyundai project for consulting/BA framing."
-                ),
-                "Program Management": (
-                    "Lead with BB Wellness + Thomson Reuters. "
-                    "Emphasize stakeholder coordination, timelines, deliverables, OKRs. "
-                    "Include Professional Development Lead in leadership section."
-                ),
-                "Marketing Operations": (
-                    "Lead with BB Wellness. "
-                    "Emphasize campaign reporting, competitive analysis, content planning. "
-                    "Include LinkedIn Ads or Value Proposition Canvas project."
-                ),
-                "Product Marketing": (
-                    "Lead with BB Wellness. "
-                    "Emphasize customer insights, competitive analysis, go-to-market. "
-                    "Include Value Proposition Canvas and LinkedIn Ads projects."
-                ),
-                "Consulting": (
-                    "Lead with Hyundai Rotem project upfront. "
-                    "Emphasize structured problem solving, stakeholder interviews, executive presentations. "
-                    "Include Thomson Reuters + Goldman for operational credibility."
-                ),
-            }
-            st.info(family_notes.get(best_family, "Review the role requirements and align with closest experience."))
-
-            if visa_risk:
-                st.warning(
-                    "This JD may not sponsor visas. Verify before applying — "
-                    "look for 'H-1B' or 'work authorization' language."
-                )
-
-            st.session_state["last_jd"] = jd_text
-            st.session_state["last_family"] = best_family
+            st.subheader("Tailored Resumes")
+            for r in results:
+                if r["ok"]:
+                    with st.expander(f"✅ {r['company']} — {r['role']}  ·  {r['family']}"):
+                        st.write(f"**Role family detected:** {r['family']}")
+                        st.write(f"**Saved to:** `{Path(r['resume_path']).parent}`")
+                        if r["warnings"]:
+                            st.caption("Content trimmed to fit 1 page: "
+                                       + "; ".join(r["warnings"]))
+                        with open(r["resume_path"], "rb") as f:
+                            st.download_button(
+                                "⬇️ Download resume",
+                                data=f, file_name=Path(r["resume_path"]).name,
+                                mime="application/vnd.openxmlformats-officedocument."
+                                     "wordprocessingml.document",
+                                key=f"dl_{r['resume_path']}")
+                        # Offer to add to tracker
+                        if st.button("Add to Tracker", key=f"trk_{r['resume_path']}"):
+                            rows = load_tracker()
+                            rows.append({
+                                "company": r["company"], "role": r["role"],
+                                "location": "", "url": "",
+                                "date_added": str(date.today()),
+                                "status": "To Apply",
+                                "notes": f"Resume tailored ({r['family']})",
+                            })
+                            save_tracker(rows)
+                            st.success("Added to tracker.")
+                else:
+                    st.error(f"❌ {r['company']} — {r['role']}: {r['error']}")
 
 # ════════════════════════════════════════════════════════════════════════════
-# TAB 3 — RESUME
-# ════════════════════════════════════════════════════════════════════════════
-with tab_resume:
-    st.header("Generate Resume")
-
-    company_name = st.text_input("Target Company (used in filename)",
-                                 placeholder="Google")
-    role_name = st.text_input("Target Role (used in filename)",
-                               placeholder="Strategy and Operations Associate")
-
-    st.subheader("Professional Summary")
-    summary_text = st.text_area(
-        "Summary (aim for 3–4 sentences, ~430–530 chars)",
-        value=default_resume().summary,
-        height=120,
-    )
-    st.caption(f"{len(summary_text)} chars")
-
-    st.subheader("Relevant Coursework")
-    coursework = st.text_input(
-        "Coursework (comma-separated, change per role)",
-        value="Business Analytics & Reporting, Operations Management, Quantitative Analysis",
-    )
-
-    st.subheader("Skills")
-    skill_defaults = default_resume().skills
-    skill_rows = []
-    for i, cat in enumerate(skill_defaults):
-        c1, c2 = st.columns([1, 3])
-        with c1:
-            name = st.text_input(f"Category {i+1}", value=cat.name, key=f"sname_{i}")
-        with c2:
-            skills = st.text_input(f"Skills {i+1}", value=cat.skills, key=f"sskills_{i}")
-        skill_rows.append(SkillCategory(name, skills))
-
-    if st.button("Generate Resume", type="primary"):
-        if not company_name or not role_name:
-            st.warning("Enter company and role name first.")
-        else:
-            data = default_resume()
-            data.summary = summary_text
-            data.coursework = coursework
-            data.skills = skill_rows
-
-            slug = f"{company_name.replace(' ', '_')}_{role_name.replace(' ', '_')}"
-            out_path = str(OUTPUT_DIR / f"resume_{slug}.docx")
-
-            with st.spinner("Generating…"):
-                path, warnings = generate(data, out_path)
-
-            st.success(f"Resume generated: `{Path(path).name}`")
-
-            if warnings:
-                with st.expander("Content warnings (auto-trimmed to fit 1 page)"):
-                    for w in warnings:
-                        st.write(f"• {w}")
-
-            with open(path, "rb") as f:
-                st.download_button(
-                    label="⬇️ Download .docx",
-                    data=f,
-                    file_name=Path(path).name,
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                )
-
-# ════════════════════════════════════════════════════════════════════════════
-# TAB 4 — TRACKER
+# TAB 2 — TRACKER
 # ════════════════════════════════════════════════════════════════════════════
 with tab_tracker:
     st.header("Application Tracker")
-
     rows = load_tracker()
+    STATUSES = ["To Apply", "Applied", "Phone Screen", "Interview",
+                "Final Round", "Offer", "Rejected"]
 
-    # Add new entry manually
     with st.expander("+ Add Application"):
         nc1, nc2 = st.columns(2)
         with nc1:
@@ -449,36 +273,27 @@ with tab_tracker:
             t_location = st.text_input("Location", key="t_location")
         with nc2:
             t_url = st.text_input("Job URL", key="t_url")
-            t_status = st.selectbox("Status", ["To Apply", "Applied", "Phone Screen",
-                                               "Interview", "Final Round", "Offer", "Rejected"],
-                                    key="t_status")
+            t_status = st.selectbox("Status", STATUSES, key="t_status")
             t_notes = st.text_input("Notes", key="t_notes")
         if st.button("Add Entry"):
             if t_company and t_role:
                 rows.append({
-                    "company": t_company,
-                    "role": t_role,
-                    "location": t_location,
-                    "url": t_url,
-                    "date_added": str(date.today()),
-                    "status": t_status,
-                    "notes": t_notes,
+                    "company": t_company, "role": t_role, "location": t_location,
+                    "url": t_url, "date_added": str(date.today()),
+                    "status": t_status, "notes": t_notes,
                 })
                 save_tracker(rows)
                 st.success("Added.")
                 st.rerun()
 
     if not rows:
-        st.info("No applications tracked yet. Add them from the Search tab or manually above.")
+        st.info("No applications tracked yet.")
     else:
-        status_colors = {
-            "To Apply": "🔵", "Applied": "🟡", "Phone Screen": "🟠",
-            "Interview": "🟣", "Final Round": "🔴", "Offer": "🟢", "Rejected": "⚫",
-        }
+        icons = {"To Apply": "🔵", "Applied": "🟡", "Phone Screen": "🟠",
+                 "Interview": "🟣", "Final Round": "🔴", "Offer": "🟢", "Rejected": "⚫"}
         for i, row in enumerate(rows):
-            icon = status_colors.get(row.get("status", ""), "⚪")
-            label = f"{icon} {row['company']} — {row['role']}"
-            with st.expander(label):
+            icon = icons.get(row.get("status", ""), "⚪")
+            with st.expander(f"{icon} {row['company']} — {row['role']}"):
                 c1, c2, c3 = st.columns([2, 2, 1])
                 with c1:
                     st.write(f"**Location:** {row.get('location', '')}")
@@ -487,13 +302,9 @@ with tab_tracker:
                         st.markdown(f"[Job Posting]({row['url']})")
                 with c2:
                     new_status = st.selectbox(
-                        "Status", ["To Apply", "Applied", "Phone Screen",
-                                   "Interview", "Final Round", "Offer", "Rejected"],
-                        index=["To Apply", "Applied", "Phone Screen",
-                               "Interview", "Final Round", "Offer", "Rejected"].index(
-                                   row.get("status", "To Apply")),
-                        key=f"status_{i}",
-                    )
+                        "Status", STATUSES,
+                        index=STATUSES.index(row.get("status", "To Apply")),
+                        key=f"status_{i}")
                     new_notes = st.text_input("Notes", value=row.get("notes", ""),
                                               key=f"notes_{i}")
                 with c3:

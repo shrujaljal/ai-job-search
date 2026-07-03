@@ -72,5 +72,7 @@ upskill/*.md
 ~$*.docx
 
 # Resume engine generated output (personal)
-output/*.docx
-output/tracker.json
+output/
+
+# R history
+.Rhistory
