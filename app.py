@@ -229,15 +229,26 @@ with tab_search:
         )
 
         # Real (clickable) job links — data_editor renders on a canvas so its
-        # LinkColumn isn't a true anchor; markdown links below always work.
-        with st.expander("📎 Open job postings"):
+        # LinkColumn isn't a true anchor; HTML anchors below always work and
+        # open in a new tab. NOTE: open the app in a real browser
+        # (http://localhost:8501) — the embedded preview blocks external URLs.
+        with st.expander("📎 Open job postings (opens in a new tab)"):
+            rows_html = []
             for j in jobs:
                 url = j.get("url", "")
-                label = f"**[{j['score']}]** {j.get('title','')} — {j.get('company','')}"
+                title = j.get("title", "")
+                company = j.get("company", "")
+                score = j["score"]
                 if url:
-                    st.markdown(f"{label}  ·  [Open posting]({url})")
+                    rows_html.append(
+                        f'<div style="margin:4px 0;"><b>[{score}]</b> '
+                        f'<a href="{url}" target="_blank" rel="noopener noreferrer">'
+                        f'{title} — {company}</a></div>')
                 else:
-                    st.markdown(f"{label}  ·  _(no link)_")
+                    rows_html.append(
+                        f'<div style="margin:4px 0;"><b>[{score}]</b> '
+                        f'{title} — {company} <i>(no link)</i></div>')
+            st.markdown("\n".join(rows_html), unsafe_allow_html=True)
 
         queued_idx = edited.index[edited["Queue"]].tolist()
         n_queued = len(queued_idx)
