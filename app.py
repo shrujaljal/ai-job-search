@@ -278,20 +278,34 @@ with tab_search:
                 if r["ok"]:
                     with st.expander(f"✅ {r['company']} — {r['role']}  ·  {r['family']}"):
                         st.write(f"**Role family detected:** {r['family']}")
-                        st.write(f"**Saved to:** `{Path(r['resume_path']).parent}`")
+                        st.write(f"**Saved to:** `{r['out_dir']}`")
                         if r.get("exp_warning"):
                             st.warning("⚠️ " + r["exp_warning"])
                         if r["warnings"]:
                             st.caption("Content trimmed to fit 1 page: "
                                        + "; ".join(r["warnings"]))
-                        with open(r["resume_path"], "rb") as f:
-                            st.download_button(
-                                "⬇️ Download resume",
-                                data=f, file_name=Path(r["resume_path"]).name,
-                                mime="application/vnd.openxmlformats-officedocument."
-                                     "wordprocessingml.document",
-                                key=f"dl_{r['resume_path']}")
-                        # Offer to add to tracker
+                        if r.get("pdf_error"):
+                            st.warning("PDF not created — " + r["pdf_error"]
+                                       + " (the DOCX is still saved).")
+
+                        dl1, dl2 = st.columns(2)
+                        with dl1:
+                            with open(r["resume_path"], "rb") as f:
+                                st.download_button(
+                                    "⬇️ DOCX",
+                                    data=f, file_name=Path(r["resume_path"]).name,
+                                    mime="application/vnd.openxmlformats-officedocument."
+                                         "wordprocessingml.document",
+                                    key=f"dl_docx_{r['resume_path']}")
+                        with dl2:
+                            if r.get("pdf_path"):
+                                with open(r["pdf_path"], "rb") as f:
+                                    st.download_button(
+                                        "⬇️ PDF",
+                                        data=f, file_name=Path(r["pdf_path"]).name,
+                                        mime="application/pdf",
+                                        key=f"dl_pdf_{r['pdf_path']}")
+
                         if st.button("Add to Tracker", key=f"trk_{r['resume_path']}"):
                             rows = load_tracker()
                             rows.append({

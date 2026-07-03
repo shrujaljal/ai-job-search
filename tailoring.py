@@ -25,7 +25,21 @@ CLI_ROOTS = {
     "Indeed":    ROOT / ".agents/skills/indeed-search/cli",
     "Glassdoor": ROOT / ".agents/skills/glassdoor-search/cli",
 }
-TAILORED_ROOT = ROOT / "output" / "tailored"
+
+# Tailored resumes are written here as: <Company>/<Role>/<Role>.docx + "Shrujal Agarwal.pdf"
+TAILORED_ROOT = Path(r"C:\Users\shruj\Downloads\2026")
+CANDIDATE_NAME = "Shrujal Agarwal"
+
+# Characters not allowed in Windows file/folder names (spaces & commas are fine).
+_INVALID_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def _safe(name: str, maxlen: int = 120) -> str:
+    """Sanitize a company/role into a valid Windows file/folder name, keeping it readable."""
+    name = _INVALID_CHARS.sub("", name or "").strip()
+    name = re.sub(r"\s+", " ", name)          # collapse whitespace
+    name = name.rstrip(". ")                    # Windows dislikes trailing dot/space
+    return name[:maxlen].strip() or "Untitled"
 
 
 def _slug(text: str, maxlen: int = 60) -> str:
@@ -35,11 +49,32 @@ def _slug(text: str, maxlen: int = 60) -> str:
 
 
 def build_output_dir(company: str, role: str) -> Path:
+    """<Downloads>/2026/<Company>/<Role>/"""
+    return TAILORED_ROOT / _safe(company) / _safe(role)
+
+
+def docx_to_pdf(docx_path: Path, pdf_path: Path) -> None:
     """
-    PLACEHOLDER folder structure — to be replaced with the user's spec.
-    Currently: output/tailored/<Company>/<Role>/
+    Convert a .docx to .pdf using Microsoft Word (exact visual fidelity).
+    Safe to call from a Streamlit worker thread (initializes COM for the thread).
     """
-    return TAILORED_ROOT / _slug(company) / _slug(role)
+    import pythoncom
+    import win32com.client
+
+    pythoncom.CoInitialize()
+    word = None
+    doc = None
+    try:
+        word = win32com.client.DispatchEx("Word.Application")
+        word.Visible = False
+        doc = word.Documents.Open(str(docx_path), ReadOnly=1)
+        doc.SaveAs(str(pdf_path), FileFormat=17)  # 17 = wdFormatPDF
+    finally:
+        if doc is not None:
+            doc.Close(False)
+        if word is not None:
+            word.Quit()
+        pythoncom.CoUninitialize()
 
 
 def fetch_jd(board: str, job_id_or_url: str, timeout: int = 30) -> str:
@@ -88,17 +123,26 @@ def tailor_job(job: dict) -> dict:
         out_dir = build_output_dir(company, title)
         out_dir.mkdir(parents=True, exist_ok=True)
 
-        resume_path = out_dir / f"Resume_{_slug(company)}_{_slug(title)}.docx"
+        # DOCX named after the role.
+        role_name = _safe(title)
+        resume_path = out_dir / f"{role_name}.docx"
         try:
             _, warnings = generate(data, str(resume_path))
         except PermissionError:
-            # File likely open in Word — write a timestamped copy instead.
             import time
-            resume_path = out_dir / (
-                f"Resume_{_slug(company)}_{_slug(title)}_{int(time.time())}.docx")
+            resume_path = out_dir / f"{role_name}_{int(time.time())}.docx"
             _, warnings = generate(data, str(resume_path))
 
-        # Save the JD alongside for reference
+        # PDF named after the candidate.
+        pdf_path = out_dir / f"{CANDIDATE_NAME}.pdf"
+        pdf_error = ""
+        try:
+            docx_to_pdf(resume_path, pdf_path)
+        except Exception as e:
+            pdf_error = f"PDF conversion failed: {e}"
+            pdf_path = None
+
+        # Save the JD alongside for reference.
         jd_path = out_dir / "job_description.txt"
         jd_header = (
             f"{title}\n{company}\n{job.get('location', '')}\n"
@@ -110,13 +154,16 @@ def tailor_job(job: dict) -> dict:
 
         return {
             "company": company, "role": title, "family": family,
-            "resume_path": str(resume_path), "jd_path": str(jd_path),
+            "resume_path": str(resume_path),
+            "pdf_path": str(pdf_path) if pdf_path else "",
+            "jd_path": str(jd_path), "out_dir": str(out_dir),
             "warnings": warnings, "exp_warning": exp_warning,
-            "ok": True, "error": "",
+            "pdf_error": pdf_error, "ok": True, "error": "",
         }
     except Exception as e:
         return {
             "company": company, "role": title, "family": "",
-            "resume_path": "", "jd_path": "", "warnings": [], "exp_warning": "",
+            "resume_path": "", "pdf_path": "", "jd_path": "", "out_dir": "",
+            "warnings": [], "exp_warning": "", "pdf_error": "",
             "ok": False, "error": str(e),
         }
