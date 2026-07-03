@@ -16,7 +16,8 @@ import re
 import subprocess
 from pathlib import Path
 
-from fit import detect_family, extract_min_years, MAX_YEARS
+from fit import (detect_family, extract_min_years, MAX_YEARS,
+                 analyze_sponsorship)
 from resume_engine import tailor_for_family, generate
 
 ROOT = Path(__file__).parent
@@ -109,6 +110,20 @@ def tailor_job(job: dict) -> dict:
 
     try:
         jd_text = fetch_jd(board, job_id)
+
+        # Sponsorship guard: F1 student needs sponsorship — skip roles that
+        # block it (no sponsorship / citizenship / ITAR / clearance).
+        blocked, sp_matched = analyze_sponsorship(jd_text)
+        if blocked:
+            return {
+                "company": company, "role": title, "family": "",
+                "resume_path": "", "pdf_path": "", "jd_path": "", "out_dir": "",
+                "warnings": [], "exp_warning": "", "pdf_error": "",
+                "blocked": True,
+                "block_reason": ", ".join(sp_matched),
+                "ok": True, "error": "",
+            }
+
         family, _ = detect_family(title, jd_text)
 
         # Early-career guard: flag roles that ask for more than the target years.
@@ -158,12 +173,12 @@ def tailor_job(job: dict) -> dict:
             "pdf_path": str(pdf_path) if pdf_path else "",
             "jd_path": str(jd_path), "out_dir": str(out_dir),
             "warnings": warnings, "exp_warning": exp_warning,
-            "pdf_error": pdf_error, "ok": True, "error": "",
+            "pdf_error": pdf_error, "blocked": False, "ok": True, "error": "",
         }
     except Exception as e:
         return {
             "company": company, "role": title, "family": "",
             "resume_path": "", "pdf_path": "", "jd_path": "", "out_dir": "",
             "warnings": [], "exp_warning": "", "pdf_error": "",
-            "ok": False, "error": str(e),
+            "blocked": False, "ok": False, "error": str(e),
         }

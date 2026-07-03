@@ -275,7 +275,11 @@ with tab_search:
 
             st.subheader("Tailored Resumes")
             for r in results:
-                if r["ok"]:
+                if r.get("blocked"):
+                    st.error(f"⛔ **{r['company']} — {r['role']}**: skipped — "
+                             f"no sponsorship for F1 ({r['block_reason']}). "
+                             "Verify in the posting before ruling it out.")
+                elif r["ok"]:
                     with st.expander(f"✅ {r['company']} — {r['role']}  ·  {r['family']}"):
                         st.write(f"**Role family detected:** {r['family']}")
                         st.write(f"**Saved to:** `{r['out_dir']}`")

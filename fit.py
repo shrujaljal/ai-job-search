@@ -107,6 +107,47 @@ MID_SENIOR_RE = re.compile(
 MAX_YEARS = 4
 
 
+# ── Sponsorship / work-authorization blockers (F1 student needs sponsorship) ─
+# Each entry: (regex, human-readable label). Windowed with [^.]{0,N} so the
+# trigger words must appear close together (within a sentence), not anywhere.
+SPONSORSHIP_BLOCKERS = [
+    (r"\bno\b[^.]{0,25}\bsponsorship\b", "no visa sponsorship"),
+    (r"\bwithout\b[^.]{0,30}\bsponsorship\b", "must work without sponsorship"),
+    (r"\b(not|unable|cannot|can'?t|won'?t|does\s+not|do\s+not|will\s+not)\b"
+     r"[^.]{0,35}\bsponsor(ship)?\b", "does not sponsor visas"),
+    (r"\bsponsorship\b[^.]{0,25}\bnot\b[^.]{0,20}\b(available|offered|provided)\b",
+     "sponsorship not available"),
+    (r"\bauthorized\s+to\s+work\b[^.]{0,50}\bwithout\b[^.]{0,20}\bsponsorship\b",
+     "must be work-authorized without sponsorship"),
+    (r"\bmust\b[^.]{0,25}\b(u\.?s\.?|united\s+states)\s+citizen", "U.S. citizenship required"),
+    (r"\b(u\.?s\.?|united\s+states)\s+citizen(ship)?\b[^.]{0,25}\b(required|only|must)\b",
+     "U.S. citizenship required"),
+    (r"\bcitizenship\b[^.]{0,15}\b(is\s+)?required\b", "U.S. citizenship required"),
+    (r"\bitar\b", "ITAR / export control"),
+    (r"\bexport[\s-]control(led|s)?\b", "export-controlled role"),
+    (r"\bsecurity\s+clearance\b", "requires security clearance"),
+    (r"\b(ts/sci|top\s+secret|secret\s+clearance)\b", "requires security clearance"),
+    (r"\b(u\.?s\.?|united\s+states)\s+person\b", "must be a U.S. person (ITAR)"),
+    (r"\b(green\s+card|permanent\s+resident)\b[^.]{0,25}\b(required|only|holder)\b",
+     "green card / permanent resident required"),
+]
+_SPONSOR_RE = [(re.compile(p, re.I), label) for p, label in SPONSORSHIP_BLOCKERS]
+
+
+def analyze_sponsorship(jd_text: str) -> tuple[bool, list[str]]:
+    """
+    Scan a JD for work-authorization blockers that disqualify an F1 student
+    needing sponsorship. Returns (blocked, [matched labels]).
+    """
+    if not jd_text:
+        return False, []
+    matched = []
+    for rx, label in _SPONSOR_RE:
+        if rx.search(jd_text) and label not in matched:
+            matched.append(label)
+    return (len(matched) > 0), matched
+
+
 def extract_min_years(jd_text: str) -> int | None:
     """
     Pull the minimum years-of-experience requirement from a JD.
@@ -208,6 +249,12 @@ def score_job(title: str, company: str, location: str,
     elif MID_SENIOR_RE.search(title_l):
         score -= 12
         reasons_minus.append("senior/leveled title, may want 5+ yrs")
+
+    # ── Sponsorship / work-authorization blockers (from JD) ──────────────────
+    blocked, sp_matched = analyze_sponsorship(jd_text)
+    if blocked:
+        score -= 45
+        reasons_minus.append("no sponsorship: " + ", ".join(sp_matched))
 
     # ── Years of experience from JD (early-career target: <=4 yrs) ───────────
     min_years = extract_min_years(jd_text)
