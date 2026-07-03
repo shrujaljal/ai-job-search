@@ -86,7 +86,8 @@ def fetch_jd(board: str, job_id_or_url: str, timeout: int = 30) -> str:
     cmd = ["bun", "run", "src/cli.ts", "detail", str(job_id_or_url), "--format", "json"]
     try:
         result = subprocess.run(
-            cmd, cwd=str(cli_dir), capture_output=True, text=True, timeout=timeout
+            cmd, cwd=str(cli_dir), capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=timeout
         )
         if result.returncode != 0:
             return ""
@@ -109,7 +110,8 @@ def tailor_job(job: dict) -> dict:
     job_id = job.get("id") or job.get("url") or ""
 
     try:
-        jd_text = fetch_jd(board, job_id)
+        # Reuse the JD fetched during search if present; otherwise fetch now.
+        jd_text = job.get("jd_text") or fetch_jd(board, job_id)
 
         # Sponsorship guard: F1 student needs sponsorship — skip roles that
         # block it (no sponsorship / citizenship / ITAR / clearance).

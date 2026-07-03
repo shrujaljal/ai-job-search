@@ -9,6 +9,7 @@ Tabs:
 
 import json
 import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 from pathlib import Path
 
@@ -16,7 +17,7 @@ import pandas as pd
 import streamlit as st
 
 from fit import score_job
-from tailoring import tailor_job
+from tailoring import tailor_job, fetch_jd
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).parent
@@ -69,7 +70,8 @@ def scrape_board(board: str, query: str, location: str, date_posted: str,
             cmd += ["--jobType", job_type]
         try:
             result = subprocess.run(
-                cmd, cwd=str(cli_dir), capture_output=True, text=True, timeout=40
+                cmd, cwd=str(cli_dir), capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=40
             )
             if result.returncode != 0:
                 status = "blocked" if _is_blocked(result.stderr, result.stdout) else "error"
@@ -94,15 +96,25 @@ def scrape_board(board: str, query: str, location: str, date_posted: str,
     return jobs, status
 
 
+def _fetch_one_jd(job: dict) -> None:
+    """Fetch and cache the full JD text on a job dict (in place)."""
+    job["jd_text"] = fetch_jd(job.get("board", ""),
+                              job.get("id") or job.get("url") or "")
+
+
 def run_search(boards: list[str], query: str, location: str, date_posted: str,
                job_type: str, pages: int) -> tuple[list[dict], dict]:
-    """Scrape selected boards, score, dedupe, sort. Returns (jobs, board_status)."""
-    all_jobs = []
+    """
+    Scrape boards, fetch each JD, score on the full JD, dedupe, sort.
+    Returns (jobs, board_status).
+    """
+    # 1. Scrape all boards and dedupe.
+    unique_jobs = []
     seen = set()
     board_status = {}
-    progress = st.progress(0.0, text="Starting…")
+    progress = st.progress(0.0, text="Searching boards…")
     for i, board in enumerate(boards):
-        progress.progress(i / len(boards), text=f"Searching {board}…")
+        progress.progress(i / (len(boards) + 1), text=f"Searching {board}…")
         board_jobs, status = scrape_board(board, query, location, date_posted,
                                           job_type, pages)
         kept = 0
@@ -113,18 +125,36 @@ def run_search(boards: list[str], query: str, location: str, date_posted: str,
             if key in seen or not title:
                 continue
             seen.add(key)
-            fit = score_job(title, company, job.get("location", ""))
-            job.update({
-                "score": fit["score"], "tier": fit["tier"],
-                "family": fit["family"], "reason": fit["reason"],
-            })
-            all_jobs.append(job)
+            unique_jobs.append(job)
             kept += 1
         board_status[board] = {"status": status, "count": kept}
+
+    # 2. Fetch every JD in parallel (this is what makes the score realistic).
+    total = len(unique_jobs)
+    if total:
+        done = 0
+        with ThreadPoolExecutor(max_workers=6) as ex:
+            futures = [ex.submit(_fetch_one_jd, j) for j in unique_jobs]
+            for _ in as_completed(futures):
+                done += 1
+                progress.progress(
+                    (len(boards) + done / total) / (len(boards) + 1),
+                    text=f"Reading job descriptions… {done}/{total}")
+
+    # 3. Score on the full JD text.
+    for job in unique_jobs:
+        fit = score_job(job.get("title", ""), job.get("company", ""),
+                        job.get("location", ""), job.get("jd_text", ""))
+        job.update({
+            "score": fit["score"], "tier": fit["tier"], "family": fit["family"],
+            "reason": fit["reason"], "blocked": fit["blocked"],
+            "scored_on_jd": fit["scored_on_jd"],
+        })
+
     progress.progress(1.0, text="Done.")
     progress.empty()
-    all_jobs.sort(key=lambda j: j["score"], reverse=True)
-    return all_jobs, board_status
+    unique_jobs.sort(key=lambda j: j["score"], reverse=True)
+    return unique_jobs, board_status
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -157,16 +187,17 @@ with tab_search:
             "Job Type", ["any", "fulltime", "internship", "contract"],
             format_func=lambda x: x.title() if x != "any" else "Any")
     with c4:
-        pages = st.number_input("Pages per board", min_value=1, max_value=5, value=2,
-                                help="More pages = more jobs (slower). "
-                                     "LinkedIn ~25/pg, Glassdoor ~30/pg, Indeed ~10/pg.")
+        pages = st.number_input("Pages per board", min_value=1, max_value=5, value=1,
+                                help="Each job's full description is fetched and parsed "
+                                     "for the fit score, so more pages = noticeably slower. "
+                                     "LinkedIn ~25/pg.")
 
     if st.button("Search Jobs", type="primary"):
         if not query:
             st.warning("Enter a role or keywords to search.")
         else:
             boards = ALL_BOARDS if board_choice == "All Boards" else [board_choice]
-            with st.spinner("Scraping and scoring…"):
+            with st.spinner("Scraping, reading job descriptions, and scoring…"):
                 jobs, board_status = run_search(boards, query, location,
                                                 date_posted, job_type, int(pages))
             st.session_state["jobs"] = jobs
@@ -180,7 +211,16 @@ with tab_search:
             st.caption("  ·  ".join(parts))
 
             if jobs:
-                st.success(f"Found {len(jobs)} unique jobs, sorted by fit score.")
+                n_jd = sum(1 for j in jobs if j.get("scored_on_jd"))
+                n_blocked = sum(1 for j in jobs if j.get("blocked"))
+                msg = (f"Found {len(jobs)} unique jobs · scored on full JD: {n_jd}/"
+                       f"{len(jobs)}")
+                if n_blocked:
+                    msg += f" · {n_blocked} sponsorship-blocked"
+                st.success(msg + ".")
+                if n_jd < len(jobs):
+                    st.caption("Some descriptions couldn't be fetched — those were "
+                               "scored on title/company/location only.")
                 if any(s["status"] == "blocked" for s in board_status.values()):
                     st.info("Indeed and Glassdoor sit behind Cloudflare and often block "
                             "automated requests. LinkedIn is the reliable source.")
@@ -190,10 +230,25 @@ with tab_search:
 
     # ── Results table with fit scores + queue checkboxes ─────────────────────
     if "jobs" in st.session_state and st.session_state["jobs"]:
-        jobs = st.session_state["jobs"]
+        all_jobs_state = st.session_state["jobs"]
         st.subheader("Results")
-        st.caption("Tick **Queue** for jobs you want tailored resumes for, then click "
+
+        hide_blocked = st.checkbox(
+            "Hide sponsorship-blocked roles", value=True,
+            help="Roles whose JD requires citizenship / ITAR / no sponsorship, "
+                 "which an F1 student can't apply to.")
+        jobs = [j for j in all_jobs_state if not (hide_blocked and j.get("blocked"))]
+        if hide_blocked and not jobs:
+            st.info("Every result was sponsorship-blocked — showing them all so you "
+                    "can review. Untick the box to keep them visible.")
+            jobs = all_jobs_state
+
+        n_hidden = len(all_jobs_state) - len(jobs)
+        caption = ("Tick **Queue** for jobs you want tailored resumes for, then click "
                    "**Tailor Selected Resumes**. Sorted by fit score (best first).")
+        if n_hidden:
+            caption += f"  ({n_hidden} sponsorship-blocked role(s) hidden.)"
+        st.caption(caption)
 
         df = pd.DataFrame([{
             "Queue": False,

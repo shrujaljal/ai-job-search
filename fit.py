@@ -273,7 +273,9 @@ def score_job(title: str, company: str, location: str,
 
     # ── Clamp + tier ─────────────────────────────────────────────────────────
     score = max(0, min(100, score))
-    if score >= 75:
+    if blocked:
+        label = "Blocked"          # sponsorship/citizenship/ITAR — not eligible
+    elif score >= 75:
         label = "Strong"
     elif score >= 60:
         label = "Good"
@@ -290,4 +292,6 @@ def score_job(title: str, company: str, location: str,
         parts.append("- " + "; ".join(reasons_minus))
     reason = "   ".join(parts) if parts else "no strong signals"
 
-    return {"score": score, "tier": label, "family": family, "reason": reason}
+    return {"score": score, "tier": label, "family": family,
+            "reason": reason, "blocked": blocked, "min_years": min_years,
+            "scored_on_jd": bool(jd_text)}
