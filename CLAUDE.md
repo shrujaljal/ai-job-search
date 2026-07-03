@@ -1,11 +1,8 @@
-# Job Application Assistant for [YOUR_NAME]
-
-<!-- SETUP: This file is populated by running /setup -->
-<!-- After running /setup, all [PLACEHOLDER] tokens will be replaced with your actual information -->
+# Job Application Assistant for Shrujal Agarwal
 
 ## Role
-This repo is a job application workspace. Claude acts as a career advisor and application assistant for [YOUR_NAME], helping with:
-1. **Job fit evaluation** - Assess job postings against your profile (skills, experience, behavioral traits)
+This repo is a job application workspace. Claude acts as a career advisor and application assistant for Shrujal Agarwal, helping with:
+1. **Job fit evaluation** - Assess job postings against her profile (skills, experience, behavioral traits)
 2. **CV tailoring** - Adapt existing CV templates (LaTeX/moderncv) to target specific roles
 3. **Cover letter writing** - Draft targeted cover letters using existing templates (LaTeX)
 4. **Interview preparation** - Prepare answers, questions, and talking points for interviews
@@ -13,68 +10,106 @@ This repo is a job application workspace. Claude acts as a career advisor and ap
 
 ## Candidate Profile
 
-<!-- This section is auto-populated by /setup. You can also fill it in manually. -->
-
 ### Identity
-- **Name:** [YOUR_NAME]
-- **Location:** [YOUR_CITY], [YOUR_COUNTRY] ([YOUR_COMMUTE_CONSTRAINTS])
-- **Languages:** [YOUR_LANGUAGES]
-- **Status:** [YOUR_EMPLOYMENT_STATUS]
-- **LinkedIn headline:** "[YOUR_LINKEDIN_HEADLINE]"
+- **Name:** Shrujal Agarwal
+- **Location:** California, United States (open to relocation anywhere within the US)
+- **Languages:** English
+- **Status:** MBA graduate seeking full-time opportunities in the United States (requires H-1B sponsorship)
+- **Positioning:** "An MBA graduate who combines analytics, operations, strategy, and communication to solve business problems, improve processes, and support better decision-making across cross-functional teams."
 
 ### Education
-<!-- List your degrees, most recent first -->
-- **[DEGREE_LEVEL] in [FIELD]** ([YEAR_START]-[YEAR_END]) - [INSTITUTION]
-  - Thesis: "[THESIS_TITLE]"
-  - Topics: [KEY_TOPICS]
+- **MBA** (Graduated June 2026) - University of California, Riverside (UCR) — GPA: 3.8
+  - Honors: Beta Gamma Sigma Honor Society; 2024 Case Competition Winner
+- **Bachelor of Technology in Biotechnology** - Vellore Institute of Technology (VIT), India
 
 ### Professional Experience
-<!-- List your roles, most recent first -->
-- **[JOB_TITLE]** ([START_DATE] - [END_DATE]) - **[COMPANY]** ([LOCATION])
-  - [KEY_RESPONSIBILITY_1]
-  - [KEY_RESPONSIBILITY_2]
-  - [KEY_ACHIEVEMENT]
+- **Teaching Assistant – Statistics** (Sep 2025 – Present) - **UC Riverside** (California)
+  - Facilitated weekly graduate-level statistics lab sessions; mentored students on hypothesis testing, regression, t-tests, confidence intervals
+  - Evaluated assignments, provided structured feedback, maintained grading consistency
+  - Held office hours; simplified quantitative concepts through practical business examples
+
+- **Analyst Intern – Operations & Marketing Strategy** (Feb 2025 – Sep 2025) - **BB Wellness** (Startup)
+  - Tracked campaign performance and engagement metrics via Excel dashboards
+  - Conducted competitive analysis across digital channels; synthesized findings for leadership
+  - Coordinated cross-functional projects; maintained content calendars and project trackers
+  - Trained interns on reporting workflows and documentation standards
+  - Used AI tools (ChatGPT, Claude, Excel Copilot) to streamline recurring reporting
+
+- **Analyst – Global Operations & Strategy** (Oct 2023 – Jun 2024) - **Thomson Reuters**
+  - Analyzed operational and financial data using SQL and Advanced Excel to support reporting and business decisions
+  - Developed KPI dashboards and reporting frameworks improving operational visibility across global teams
+  - Managed SAP Ariba procurement workflows: purchase requisitions, PO validation, invoice review
+  - Supported budgeting, forecasting, and variance analysis; prepared executive summaries
+  - Standardized SOPs and documentation to improve governance and workflow consistency
+
+- **STEM Intern – Asset & Wealth Management** (Feb 2023 – Jun 2023) - **Goldman Sachs**
+  - Supported Client Revenue Operations (CRO) and Institutional Client Reporting (ICR) teams
+  - Built Excel-based workflow trackers improving visibility into reporting progress
+  - Contributed to commitment naming standardization project reducing reporting ambiguity
+  - Analyzed manual vs. automated reporting workflows; proposed process improvements
+  - Used Qlik Sense and JIRA for operational reporting and issue tracking
+
+- **Data Analyst Intern** (Jun 2022 – Aug 2022) - **Beyond Key**
+  - Retrieved and analyzed business data using SQL; developed Tableau dashboards for clients
+  - Cleaned and validated datasets; identified trends supporting operational decisions
+  - Applied Python (Pandas, NumPy) for data preparation and exploratory analysis
 
 ### Technical Skills
-- **Primary:** [YOUR_PRIMARY_SKILLS]
-- **Secondary:** [YOUR_SECONDARY_SKILLS]
-- **Domain:** [YOUR_DOMAIN_EXPERTISE]
-- **Software:** [YOUR_TOOLS_AND_SOFTWARE]
-
-### Certifications
-<!-- List relevant certifications with dates -->
-- **[CERTIFICATION_NAME]** - [HOURS]h - completed [DATE]
-
-### Publications
-<!-- List peer-reviewed publications, if any -->
-- [AUTHOR_LIST] ([YEAR]). [TITLE]. [JOURNAL].
+- **Primary:** Advanced Excel (Pivot Tables, XLOOKUP, Power Query, Copilot), SQL, Tableau, Business Analysis, Operational Reporting, KPI Dashboards
+- **Secondary:** Python (Pandas, NumPy), Qlik Sense, SAP Ariba, JIRA, Power BI (working knowledge), Salesforce (CRM familiarity), Buffer, Canva
+- **Domain:** Business Operations, Strategy & Operations, Process Improvement, Workflow Optimization, Stakeholder Management, Executive Reporting, Cross-functional Collaboration, Market Research, Competitive Analysis, Campaign Reporting, Financial Analysis, Governance
+- **AI Tools:** ChatGPT, Claude, Gemini, NotebookLM, Microsoft Copilot, Excel Copilot, n8n
 
 ### Awards
-<!-- List relevant awards, hackathons, competitions -->
-- [AWARD_NAME] - [EVENT] ([YEAR])
+- 2024 Case Competition Winner - UC Riverside / AGSM
+- Beta Gamma Sigma Honor Society (GPA honors)
 
 ### Behavioral Profile
-<!-- Your behavioral assessment results (PI, DISC, Myers-Briggs, or self-assessment) -->
-- **[TRAIT_1]** - [DESCRIPTION]
-- **[TRAIT_2]** - [DESCRIPTION]
-- **Strengths:** [YOUR_STRENGTHS]
-- **Growth areas:** [YOUR_GROWTH_AREAS]
-- **Thrives in:** [YOUR_IDEAL_ENVIRONMENT]
+- **Working style:** Structured thinker — understands the problem before jumping to solutions; breaks ambiguity into components
+- **Decision-making:** Clarifies objective → maps process → finds data → consults stakeholders → recommends practical solutions
+- **Communication:** Clear, concise, business-oriented; prefers dashboards, executive summaries, and visual frameworks over lengthy documents
+- **Leadership:** Collaborative, influence-without-authority; takes ownership of organizing, documenting, and driving execution
+- **Strengths:** Structured problem solving, executive communication, business storytelling, cross-functional collaboration, analytical reasoning, process improvement, data interpretation
+- **Growth areas:** Less interested in narrow technical specialization; building toward broader strategy/operations leadership
+- **Thrives in:** Cross-functional environments with high visibility, analytical work, fast learning, and meaningful business impact
 
-### What Excites You
-<!-- What motivates you professionally -->
-- [PASSION_1]
-- [PASSION_2]
+### What Excites Her
+- Understanding how businesses operate — why processes are inefficient, why teams are misaligned, what information leadership is missing
+- Taking ambiguous business problems and creating structure around them
+- Connecting data, business context, and people to improve decision-making
 
-### Target Sectors
-<!-- Industries and companies you're targeting -->
-- [SECTOR_1]: [EXAMPLE_COMPANIES]
-- [SECTOR_2]: [EXAMPLE_COMPANIES]
+### Target Sectors (Priority Order)
+- **Priority 1:** Technology, Enterprise SaaS, AI, FinTech, Healthcare Technology
+- **Priority 2:** Management Consulting (MBB, Big 4), Financial Services (GS, JPM, Amex, Visa)
+- **Priority 3:** Consumer Technology, Healthcare/Biotech, Enterprise Software
+
+### Target Role Families (Priority Order)
+1. Strategy & Operations / Business Operations / Operations Analyst
+2. Business Analyst / Strategy Analyst
+3. Program Management / Business Program Manager
+4. Product Marketing / Marketing Strategy / Marketing Operations
+5. Consulting / Corporate Strategy / Operational Excellence
 
 ### Deal-breakers
-<!-- Hard constraints on job search -->
-- [DEALBREAKER_1]
-- [DEALBREAKER_2]
+- Roles requiring H-1B sponsorship rejection (prioritize known sponsors)
+- Pure software engineering, machine learning, data science, or quant finance roles
+- Heavy quota-carrying sales roles
+- Roles with no cross-functional or strategic component
+
+### MBA Projects (for resume use)
+- **Hyundai Rotem Operations Consulting** — MBA consulting engagement; process mapping, stakeholder interviews, bottleneck analysis, phased implementation roadmap for LA Metro railcar manufacturing facility (strongest project for Strategy/Operations/Consulting/BA)
+- **LinkedIn Ads Marketing Strategy** — B2B campaign strategy, customer segmentation, persona development, KPI selection (best for Marketing/Product Marketing)
+- **Value Proposition Canvas** — Customer needs analysis, pain/gain mapping, positioning strategy (best for Product Marketing)
+- **Roche vs. Illumina Strategic Analysis** — Competitive analysis, Porter's Five Forces, SWOT, strategic recommendations (best for Healthcare/Strategy/Consulting)
+- **Root Beer Game** — Supply chain simulation, Bullwhip Effect, systems thinking (best for Operations/Supply Chain)
+- **Hotelling Location Strategy** — Game theory, competitive positioning (supporting project for Strategy/Consulting)
+
+### Leadership (MBA)
+- **Professional Development Lead**, AGSM Student Association — Led ~20-member team; launched podcast initiative; improved student engagement with career content
+- **Marketing & Communications Lead**, AGSM Student Association — Newsletters, communication calendars, student outreach
+- **Marketing Director**, TEDx UCR — Led 25-member marketing team for university TEDx event; campaign planning and execution
+- **Finance Director**, Women in Business Association — Budget planning, financial coordination
+- **Operations Lead**, Make A Difference (MAD) — Volunteer coordination, workflow organization
 
 ## Git Workflow
 - Always pull latest changes at the start of a session
