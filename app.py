@@ -43,11 +43,21 @@ def save_tracker(rows: list[dict]) -> None:
 
 
 # ── Scraper ───────────────────────────────────────────────────────────────────
+def _is_blocked(stderr: str, stdout: str) -> bool:
+    blob = (stderr + stdout).lower()
+    return any(s in blob for s in ("403", "401", "cloudflare", "access denied",
+                                   "blocking this request"))
+
+
 def scrape_board(board: str, query: str, location: str, date_posted: str,
-                 job_type: str, pages: int) -> list[dict]:
-    """Scrape one board across N pages. Returns list of job dicts (board tagged)."""
+                 job_type: str, pages: int) -> tuple[list[dict], str]:
+    """
+    Scrape one board across N pages.
+    Returns (jobs, status) where status is 'ok', 'blocked', 'empty', or 'error'.
+    """
     cli_dir = CLI_ROOTS[board]
-    jobs = []
+    jobs: list[dict] = []
+    status = "empty"
     for page in range(1, pages + 1):
         cmd = ["bun", "run", "src/cli.ts", "search",
                "--query", query, "--format", "json", "--page", str(page)]
@@ -62,7 +72,7 @@ def scrape_board(board: str, query: str, location: str, date_posted: str,
                 cmd, cwd=str(cli_dir), capture_output=True, text=True, timeout=40
             )
             if result.returncode != 0:
-                st.warning(f"{board} p{page}: {result.stderr[:150]}")
+                status = "blocked" if _is_blocked(result.stderr, result.stdout) else "error"
                 break
             raw = result.stdout.strip()
             if not raw:
@@ -74,41 +84,47 @@ def scrape_board(board: str, query: str, location: str, date_posted: str,
             for j in results:
                 j["board"] = board
             jobs += results
+            status = "ok"
         except subprocess.TimeoutExpired:
-            st.warning(f"{board} p{page} timed out.")
+            status = "error"
             break
         except json.JSONDecodeError:
-            st.warning(f"{board} p{page}: could not parse output.")
+            status = "error"
             break
-    return jobs
+    return jobs, status
 
 
 def run_search(boards: list[str], query: str, location: str, date_posted: str,
-               job_type: str, pages: int) -> list[dict]:
-    """Scrape selected boards, score, dedupe, sort by fit score."""
+               job_type: str, pages: int) -> tuple[list[dict], dict]:
+    """Scrape selected boards, score, dedupe, sort. Returns (jobs, board_status)."""
     all_jobs = []
     seen = set()
+    board_status = {}
     progress = st.progress(0.0, text="Starting…")
     for i, board in enumerate(boards):
         progress.progress(i / len(boards), text=f"Searching {board}…")
-        for job in scrape_board(board, query, location, date_posted, job_type, pages):
+        board_jobs, status = scrape_board(board, query, location, date_posted,
+                                          job_type, pages)
+        kept = 0
+        for job in board_jobs:
             title = job.get("title", "")
             company = job.get("company", "")
             key = (title.lower().strip(), company.lower().strip())
             if key in seen or not title:
                 continue
             seen.add(key)
-            loc = job.get("location", "")
-            fit = score_job(title, company, loc)
+            fit = score_job(title, company, job.get("location", ""))
             job.update({
                 "score": fit["score"], "tier": fit["tier"],
                 "family": fit["family"], "reason": fit["reason"],
             })
             all_jobs.append(job)
+            kept += 1
+        board_status[board] = {"status": status, "count": kept}
     progress.progress(1.0, text="Done.")
     progress.empty()
     all_jobs.sort(key=lambda j: j["score"], reverse=True)
-    return all_jobs
+    return all_jobs, board_status
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -151,14 +167,26 @@ with tab_search:
         else:
             boards = ALL_BOARDS if board_choice == "All Boards" else [board_choice]
             with st.spinner("Scraping and scoring…"):
-                jobs = run_search(boards, query, location, date_posted,
-                                  job_type, int(pages))
+                jobs, board_status = run_search(boards, query, location,
+                                                date_posted, job_type, int(pages))
+            st.session_state["jobs"] = jobs
+
+            # Per-board status line (honest about Cloudflare-blocked boards)
+            icons = {"ok": "✅", "blocked": "🚫", "error": "⚠️", "empty": "∅"}
+            labels = {"ok": lambda c: f"{c} jobs", "blocked": lambda c: "blocked (Cloudflare)",
+                      "error": lambda c: "error", "empty": lambda c: "no results"}
+            parts = [f"{icons[s['status']]} **{b}**: {labels[s['status']](s['count'])}"
+                     for b, s in board_status.items()]
+            st.caption("  ·  ".join(parts))
+
             if jobs:
-                st.session_state["jobs"] = jobs
-                st.success(f"Found {len(jobs)} unique jobs across {len(boards)} board(s), "
-                           "sorted by fit score.")
+                st.success(f"Found {len(jobs)} unique jobs, sorted by fit score.")
+                if any(s["status"] == "blocked" for s in board_status.values()):
+                    st.info("Indeed and Glassdoor sit behind Cloudflare and often block "
+                            "automated requests. LinkedIn is the reliable source.")
             else:
-                st.info("No results. Try different keywords or boards.")
+                st.info("No results. LinkedIn is the most reliable board; "
+                        "try different keywords.")
 
     # ── Results table with fit scores + queue checkboxes ─────────────────────
     if "jobs" in st.session_state and st.session_state["jobs"]:
@@ -176,7 +204,6 @@ with tab_search:
             "Location": j.get("location", ""),
             "Why this score": j["reason"],
             "Board": j.get("board", ""),
-            "Link": j.get("url", ""),
         } for j in jobs])
 
         edited = st.data_editor(
@@ -195,12 +222,22 @@ with tab_search:
                 "Why this score": st.column_config.TextColumn(
                     "Why this score", width="large"),
                 "Board": st.column_config.TextColumn("Board", width="small"),
-                "Link": st.column_config.LinkColumn("Link", display_text="Open", width="small"),
             },
             disabled=["Score", "Tier", "Title", "Company", "Location",
-                      "Why this score", "Board", "Link"],
+                      "Why this score", "Board"],
             key="results_editor",
         )
+
+        # Real (clickable) job links — data_editor renders on a canvas so its
+        # LinkColumn isn't a true anchor; markdown links below always work.
+        with st.expander("📎 Open job postings"):
+            for j in jobs:
+                url = j.get("url", "")
+                label = f"**[{j['score']}]** {j.get('title','')} — {j.get('company','')}"
+                if url:
+                    st.markdown(f"{label}  ·  [Open posting]({url})")
+                else:
+                    st.markdown(f"{label}  ·  _(no link)_")
 
         queued_idx = edited.index[edited["Queue"]].tolist()
         n_queued = len(queued_idx)
@@ -231,6 +268,8 @@ with tab_search:
                     with st.expander(f"✅ {r['company']} — {r['role']}  ·  {r['family']}"):
                         st.write(f"**Role family detected:** {r['family']}")
                         st.write(f"**Saved to:** `{Path(r['resume_path']).parent}`")
+                        if r.get("exp_warning"):
+                            st.warning("⚠️ " + r["exp_warning"])
                         if r["warnings"]:
                             st.caption("Content trimmed to fit 1 page: "
                                        + "; ".join(r["warnings"]))

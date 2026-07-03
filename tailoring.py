@@ -16,7 +16,7 @@ import re
 import subprocess
 from pathlib import Path
 
-from fit import detect_family
+from fit import detect_family, extract_min_years, MAX_YEARS
 from resume_engine import tailor_for_family, generate
 
 ROOT = Path(__file__).parent
@@ -76,13 +76,27 @@ def tailor_job(job: dict) -> dict:
         jd_text = fetch_jd(board, job_id)
         family, _ = detect_family(title, jd_text)
 
+        # Early-career guard: flag roles that ask for more than the target years.
+        exp_warning = ""
+        min_years = extract_min_years(jd_text)
+        if min_years is not None and min_years > MAX_YEARS:
+            exp_warning = (f"This role asks for {min_years}+ years of experience "
+                           f"(above the ~{MAX_YEARS}-year early-career target).")
+
         data = tailor_for_family(family)
 
         out_dir = build_output_dir(company, title)
         out_dir.mkdir(parents=True, exist_ok=True)
 
         resume_path = out_dir / f"Resume_{_slug(company)}_{_slug(title)}.docx"
-        _, warnings = generate(data, str(resume_path))
+        try:
+            _, warnings = generate(data, str(resume_path))
+        except PermissionError:
+            # File likely open in Word — write a timestamped copy instead.
+            import time
+            resume_path = out_dir / (
+                f"Resume_{_slug(company)}_{_slug(title)}_{int(time.time())}.docx")
+            _, warnings = generate(data, str(resume_path))
 
         # Save the JD alongside for reference
         jd_path = out_dir / "job_description.txt"
@@ -97,11 +111,12 @@ def tailor_job(job: dict) -> dict:
         return {
             "company": company, "role": title, "family": family,
             "resume_path": str(resume_path), "jd_path": str(jd_path),
-            "warnings": warnings, "ok": True, "error": "",
+            "warnings": warnings, "exp_warning": exp_warning,
+            "ok": True, "error": "",
         }
     except Exception as e:
         return {
             "company": company, "role": title, "family": "",
-            "resume_path": "", "jd_path": "", "warnings": [],
+            "resume_path": "", "jd_path": "", "warnings": [], "exp_warning": "",
             "ok": False, "error": str(e),
         }

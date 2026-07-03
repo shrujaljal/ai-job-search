@@ -94,8 +94,39 @@ HARD_RED_FLAGS = [
     "account executive", "sales representative", "sales rep", "quota",
     "cloud architect", "security engineer", "android", "ios developer",
 ]
-SENIOR_FLAGS = ["director", "vice president", "vp,", "vp ", "head of", "chief",
-                "principal", "senior manager", "sr. manager", "sr manager"]
+# Management-level titles — too senior for an early-career (2-3 yr) candidate.
+VERY_SENIOR_FLAGS = [
+    "director", "vice president", "vp,", "vp ", " vp", "head of", "chief",
+    "principal", "senior manager", "sr. manager", "sr manager", "distinguished",
+]
+# Titles that usually imply 5+ years — down-rank but don't exclude.
+MID_SENIOR_RE = re.compile(
+    r"\b(senior|sr\.?|staff|lead|expert)\b|\b(ii|iii|iv|v)\b|level\s*[3-9]", re.I)
+
+# Max years of experience the candidate targets (early career).
+MAX_YEARS = 4
+
+
+def extract_min_years(jd_text: str) -> int | None:
+    """
+    Pull the minimum years-of-experience requirement from a JD.
+    Handles '5+ years', '3-5 years', 'minimum of 4 years', 'at least 3 years'.
+    Returns the smallest required number, or None if not stated.
+    """
+    if not jd_text:
+        return None
+    text = jd_text.lower()
+    mins = []
+    # "3-5 years", "3 to 5 years"  -> take the low end
+    for m in re.finditer(r"(\d{1,2})\s*(?:-|to|–)\s*(\d{1,2})\s*\+?\s*years?", text):
+        mins.append(int(m.group(1)))
+    # "5+ years", "minimum of 4 years", "at least 3 years", "4 years of"
+    for m in re.finditer(
+        r"(?:minimum(?:\s+of)?|at least|min\.?)?\s*(\d{1,2})\s*\+?\s*years?"
+        r"(?:\s+of)?\s+(?:experience|exp|professional|relevant|industry)", text):
+        mins.append(int(m.group(1)))
+    reasonable = [y for y in mins if 0 < y <= 20]
+    return min(reasonable) if reasonable else None
 
 
 def _norm(text: str) -> str:
@@ -171,9 +202,21 @@ def score_job(title: str, company: str, location: str,
         reasons_minus.append("location outside target states")
 
     # ── Seniority penalty (too senior for early career) ──────────────────────
-    if any(sf in title_l for sf in SENIOR_FLAGS):
-        score -= 22
-        reasons_minus.append("likely too senior")
+    if any(sf in title_l for sf in VERY_SENIOR_FLAGS):
+        score -= 24
+        reasons_minus.append("management-level, likely too senior")
+    elif MID_SENIOR_RE.search(title_l):
+        score -= 12
+        reasons_minus.append("senior/leveled title, may want 5+ yrs")
+
+    # ── Years of experience from JD (early-career target: <=4 yrs) ───────────
+    min_years = extract_min_years(jd_text)
+    if min_years is not None:
+        if min_years > MAX_YEARS:
+            score -= 26
+            reasons_minus.append(f"requires {min_years}+ yrs experience")
+        else:
+            reasons_plus.append(f"experience bar fits ({min_years} yrs)")
 
     # ── Hard red flags (technical / sales roles the profile excludes) ────────
     hit_flag = next((rf for rf in HARD_RED_FLAGS if rf in title_l), None)
