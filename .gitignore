@@ -67,3 +67,10 @@ upskill/*.md
 
 # Agent usage logs
 .agents/
+
+# Word temp lock files
+~$*.docx
+
+# Resume engine generated output (personal)
+output/*.docx
+output/tracker.json
