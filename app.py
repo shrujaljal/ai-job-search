@@ -66,9 +66,9 @@ def run_scraper(board: str, query: str, location: str,
         if not raw:
             return []
         data = json.loads(raw)
-        # Normalise: some CLIs return {"jobs": [...]} others return [...]
-        if isinstance(data, dict) and "jobs" in data:
-            return data["jobs"]
+        # All three scrapers return {"meta": {...}, "results": [...]}
+        if isinstance(data, dict):
+            return data.get("results") or data.get("jobs") or []
         if isinstance(data, list):
             return data
         return []
@@ -237,7 +237,7 @@ with tab_search:
             company = job.get("company") or job.get("companyName") or ""
             loc = job.get("location") or ""
             url = job.get("url") or job.get("jobUrl") or job.get("link") or "#"
-            posted = job.get("postedAt") or job.get("datePosted") or ""
+            posted = job.get("date") or job.get("postedAt") or job.get("datePosted") or ""
 
             with st.expander(f"{title} — {company}"):
                 cols = st.columns([3, 1])
