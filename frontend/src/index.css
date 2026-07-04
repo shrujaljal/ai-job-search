@@ -38,6 +38,10 @@ body {
 /* Smooth colour transitions on interactive surfaces (not everything). */
 .themed { transition: background-color .25s ease, border-color .25s ease, color .15s ease; }
 
+/* Hide scrollbars on horizontally-scrolling strips (e.g. the tab bar). */
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 @keyframes floaty { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
 @keyframes blink  { 0%,92%,100%{transform:scaleY(1)} 96%{transform:scaleY(.08)} }
 @keyframes pop    { from{opacity:0;transform:scale(.96)} to{opacity:1;transform:none} }

@@ -75,16 +75,16 @@ export default function App() {
 
         {/* Top tabs */}
         <div className="mx-auto max-w-6xl px-2">
-          <nav className="flex gap-1 overflow-x-auto">
+          <nav className="no-scrollbar flex gap-1 overflow-x-auto overflow-y-hidden">
             {PAGES.map((p) => {
               const on = p.key === page
               return (
                 <button key={p.key} onClick={() => setPage(p.key)}
-                  className={`relative whitespace-nowrap rounded-t-lg px-4 py-2.5 text-sm font-medium transition ${on ? 'text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>
+                  className={`relative whitespace-nowrap rounded-t-lg px-4 pb-3 pt-2.5 text-sm font-medium transition ${on ? 'text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>
                   <span className="mr-1.5">{p.icon}</span>{p.label}
                   {on && (
                     <motion.span layoutId="tab-underline"
-                      className="absolute inset-x-2 -bottom-px h-0.5 rounded-full"
+                      className="absolute inset-x-2 bottom-0 h-0.5 rounded-full"
                       style={{ background: 'linear-gradient(90deg, var(--accent), var(--accent-2))' }} />
                   )}
                 </button>
