@@ -8,8 +8,8 @@ $root = $PSScriptRoot
 Write-Host "=== Job Search Assistant Setup ===" -ForegroundColor Cyan
 
 # --- 1. Python packages ------------------------------------------------------
-Write-Host "`n[1/2] Installing Python packages (streamlit, python-docx, lxml, pywin32)..." -ForegroundColor Yellow
-python -m pip install --quiet python-docx streamlit lxml pywin32
+Write-Host "`n[1/3] Installing Python packages (streamlit, python-docx, lxml, pywin32, Pillow)..." -ForegroundColor Yellow
+python -m pip install --quiet python-docx streamlit lxml pywin32 Pillow
 if ($LASTEXITCODE -eq 0) {
     Write-Host "  Python packages installed." -ForegroundColor Green
 } else {
@@ -17,7 +17,7 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 # --- 2. Scraper CLI dependencies (Bun) ---------------------------------------
-Write-Host "`n[2/2] Installing scraper dependencies (bun install)..." -ForegroundColor Yellow
+Write-Host "`n[2/3] Installing scraper dependencies (bun install)..." -ForegroundColor Yellow
 
 $bun = Get-Command bun -ErrorAction SilentlyContinue
 if (-not $bun) {
@@ -43,6 +43,27 @@ if (-not $bun) {
     }
 }
 
+# --- 3. Desktop / Start Menu shortcuts (with the J icon) ----------------------
+Write-Host "`n[3/3] Creating desktop launcher and shortcuts..." -ForegroundColor Yellow
+
+$icon = Join-Path $root "assets\job_app_agent.ico"
+if (-not (Test-Path $icon)) {
+    Write-Host "  Generating J icon..." -ForegroundColor DarkGray
+    try { python (Join-Path $root "assets\make_icon.py") | Out-Null } catch {}
+}
+
+$mkShortcuts = Join-Path $root "assets\make_shortcuts.ps1"
+if (Test-Path $mkShortcuts) {
+    try {
+        & $mkShortcuts
+    } catch {
+        Write-Host "  Shortcut creation failed: $($_.Exception.Message)" -ForegroundColor Red
+    }
+} else {
+    Write-Host "  assets\make_shortcuts.ps1 not found, skipping." -ForegroundColor DarkGray
+}
+
 Write-Host "`n=== Setup complete ===" -ForegroundColor Cyan
-Write-Host "Launch the app with:" -ForegroundColor White
-Write-Host "  python -m streamlit run app.py" -ForegroundColor Green
+Write-Host "Launch the app by double-clicking the 'Job application agent' icon on your Desktop," -ForegroundColor White
+Write-Host "or run:  python -m streamlit run app.py" -ForegroundColor Green
+Write-Host "To pin to the taskbar: right-click the desktop icon -> Show more options -> Pin to taskbar." -ForegroundColor DarkGray
