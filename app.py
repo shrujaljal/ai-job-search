@@ -31,6 +31,25 @@ TRACKER_FILE = ROOT / "output" / "tracker.json"
 OUTPUT_DIR = ROOT / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
+# Curated target-role search terms (priority order from the candidate profile).
+TARGET_ROLES = [
+    "Strategy & Operations Analyst",
+    "Business Operations Analyst",
+    "Operations Analyst",
+    "Business Analyst",
+    "Strategy Analyst",
+    "Program Manager",
+    "Business Program Manager",
+    "Product Marketing Manager",
+    "Marketing Operations",
+    "Marketing Strategy",
+    "Revenue Operations",
+    "Corporate Strategy",
+    "Consultant",
+    "Operational Excellence",
+    "Chief of Staff",
+]
+
 
 # ── Tracker persistence ───────────────────────────────────────────────────────
 def load_tracker() -> list[dict]:
@@ -102,32 +121,49 @@ def _fetch_one_jd(job: dict) -> None:
                               job.get("id") or job.get("url") or "")
 
 
-def run_search(boards: list[str], query: str, location: str, date_posted: str,
-               job_type: str, pages: int) -> tuple[list[dict], dict]:
+def run_search(boards: list[str], queries: list[str], location: str,
+               date_posted: str, job_type: str, pages: int) -> tuple[list[dict], dict]:
     """
-    Scrape boards, fetch each JD, score on the full JD, dedupe, sort.
+    Scrape each (board, query), fetch each JD, score on the full JD, dedupe, sort.
     Returns (jobs, board_status).
     """
-    # 1. Scrape all boards and dedupe.
+    # 1. Scrape every board for every selected role; dedupe globally.
     unique_jobs = []
     seen = set()
     board_status = {}
+    n_tasks = max(1, len(boards) * len(queries))
     progress = st.progress(0.0, text="Searching boards…")
-    for i, board in enumerate(boards):
-        progress.progress(i / (len(boards) + 1), text=f"Searching {board}…")
-        board_jobs, status = scrape_board(board, query, location, date_posted,
-                                          job_type, pages)
+    task = 0
+    for board in boards:
+        statuses = []
         kept = 0
-        for job in board_jobs:
-            title = job.get("title", "")
-            company = job.get("company", "")
-            key = (title.lower().strip(), company.lower().strip())
-            if key in seen or not title:
-                continue
-            seen.add(key)
-            unique_jobs.append(job)
-            kept += 1
-        board_status[board] = {"status": status, "count": kept}
+        for q in queries:
+            task += 1
+            progress.progress(task / (n_tasks + 1),
+                              text=f"Searching {board}: {q}…")
+            board_jobs, status = scrape_board(board, q, location, date_posted,
+                                              job_type, pages)
+            statuses.append(status)
+            for job in board_jobs:
+                job["query"] = q
+                title = job.get("title", "")
+                company = job.get("company", "")
+                key = (title.lower().strip(), company.lower().strip())
+                if key in seen or not title:
+                    continue
+                seen.add(key)
+                unique_jobs.append(job)
+                kept += 1
+        # Board status: prefer ok > blocked > error > empty across queries.
+        if "ok" in statuses:
+            bs = "ok"
+        elif "blocked" in statuses:
+            bs = "blocked"
+        elif "error" in statuses:
+            bs = "error"
+        else:
+            bs = "empty"
+        board_status[board] = {"status": bs, "count": kept}
 
     # 2. Fetch every JD in parallel (this is what makes the score realistic).
     total = len(unique_jobs)
@@ -172,7 +208,13 @@ with tab_search:
 
     c1, c2 = st.columns(2)
     with c1:
-        query = st.text_input("Role / Keywords", placeholder="Strategy & Operations Analyst")
+        queries = st.multiselect(
+            "Role / Keywords", options=TARGET_ROLES, default=[],
+            accept_new_options=True,
+            placeholder="Pick your target roles (or type a custom one)",
+            help="Select one or more of your target roles — each is searched and "
+                 "the results are combined and de-duplicated. You can also type a "
+                 "custom keyword and press Enter.")
         location = st.text_input("Location", placeholder="California, USA")
     with c2:
         board_choice = st.selectbox("Job Board", ["All Boards"] + ALL_BOARDS)
@@ -193,12 +235,12 @@ with tab_search:
                                      "LinkedIn ~25/pg.")
 
     if st.button("Search Jobs", type="primary"):
-        if not query:
-            st.warning("Enter a role or keywords to search.")
+        if not queries:
+            st.warning("Pick at least one role (or type a custom keyword) to search.")
         else:
             boards = ALL_BOARDS if board_choice == "All Boards" else [board_choice]
             with st.spinner("Scraping, reading job descriptions, and scoring…"):
-                jobs, board_status = run_search(boards, query, location,
+                jobs, board_status = run_search(boards, queries, location,
                                                 date_posted, job_type, int(pages))
             st.session_state["jobs"] = jobs
 
