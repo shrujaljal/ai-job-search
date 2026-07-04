@@ -78,6 +78,43 @@ def docx_to_pdf(docx_path: Path, pdf_path: Path) -> None:
         pythoncom.CoUninitialize()
 
 
+def _html_to_text(html: str) -> str:
+    """Very small HTML-to-text: drop scripts/styles/nav, strip tags, collapse space."""
+    html = re.sub(r"(?is)<(script|style|nav|header|footer|noscript)[^>]*>.*?</\1>", " ", html)
+    text = re.sub(r"(?s)<[^>]+>", " ", html)
+    text = re.sub(r"&(nbsp|amp|lt|gt|#\d+|[a-z]+);", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def jd_from_url(url: str, timeout: int = 30) -> str:
+    """
+    Best-effort JD text from a job URL. Known boards go through the detail CLI;
+    other URLs are fetched and stripped to text. Returns "" if it can't read it.
+    """
+    import urllib.request
+
+    url = (url or "").strip()
+    if not url:
+        return ""
+    low = url.lower()
+    if "linkedin.com" in low:
+        return fetch_jd("LinkedIn", url, timeout)
+    if "indeed.com" in low:
+        return fetch_jd("Indeed", url, timeout)
+    if "glassdoor." in low:
+        return fetch_jd("Glassdoor", url, timeout)
+    try:
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                          "AppleWebKit/537.36 (KHTML, like Gecko) "
+                          "Chrome/131.0.0.0 Safari/537.36"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+        return _html_to_text(raw)
+    except Exception:
+        return ""
+
+
 def fetch_jd(board: str, job_id_or_url: str, timeout: int = 30) -> str:
     """Fetch full JD description text via the board's detail command."""
     cli_dir = CLI_ROOTS.get(board)
@@ -97,12 +134,19 @@ def fetch_jd(board: str, job_id_or_url: str, timeout: int = 30) -> str:
         return ""
 
 
-def tailor_job(job: dict) -> dict:
+def tailor_job(job: dict, enforce_sponsorship: bool = True) -> dict:
     """
-    Tailor a resume for one queued job.
+    Tailor a resume for one job.
 
-    `job` needs: title, company, location, board, id (or url).
-    Returns dict with: company, role, family, resume_path, jd_path, warnings, ok, error.
+    `job` needs: title, company, location, board, id (or url). May include
+    a pre-fetched `jd_text`.
+
+    enforce_sponsorship=True  -> sponsorship-blocked roles are skipped (search flow).
+    enforce_sponsorship=False -> generate anyway, surface a warning (manual paste flow).
+
+    Returns dict with: company, role, family, resume_path, pdf_path, jd_path,
+    out_dir, warnings, exp_warning, sponsorship_warning, pdf_error, url, location,
+    blocked, ok, error.
     """
     title = job.get("title", "Untitled")
     company = job.get("company", "Unknown")
@@ -113,18 +157,23 @@ def tailor_job(job: dict) -> dict:
         # Reuse the JD fetched during search if present; otherwise fetch now.
         jd_text = job.get("jd_text") or fetch_jd(board, job_id)
 
-        # Sponsorship guard: F1 student needs sponsorship — skip roles that
-        # block it (no sponsorship / citizenship / ITAR / clearance).
+        # Sponsorship guard: F1 student needs sponsorship.
         blocked, sp_matched = analyze_sponsorship(jd_text)
-        if blocked:
+        if blocked and enforce_sponsorship:
             return {
                 "company": company, "role": title, "family": "",
                 "resume_path": "", "pdf_path": "", "jd_path": "", "out_dir": "",
-                "warnings": [], "exp_warning": "", "pdf_error": "",
-                "blocked": True,
-                "block_reason": ", ".join(sp_matched),
+                "warnings": [], "exp_warning": "", "sponsorship_warning": "",
+                "pdf_error": "", "url": job.get("url", ""),
+                "location": job.get("location", ""),
+                "blocked": True, "block_reason": ", ".join(sp_matched),
                 "ok": True, "error": "",
             }
+        sponsorship_warning = ""
+        if blocked:
+            sponsorship_warning = ("This role appears to restrict sponsorship / "
+                                   "require work authorization the candidate lacks: "
+                                   + ", ".join(sp_matched))
 
         family, _ = detect_family(title, jd_text)
 
@@ -175,12 +224,17 @@ def tailor_job(job: dict) -> dict:
             "pdf_path": str(pdf_path) if pdf_path else "",
             "jd_path": str(jd_path), "out_dir": str(out_dir),
             "warnings": warnings, "exp_warning": exp_warning,
-            "pdf_error": pdf_error, "blocked": False, "ok": True, "error": "",
+            "sponsorship_warning": sponsorship_warning,
+            "pdf_error": pdf_error, "url": job.get("url", ""),
+            "location": job.get("location", ""),
+            "blocked": False, "ok": True, "error": "",
         }
     except Exception as e:
         return {
             "company": company, "role": title, "family": "",
             "resume_path": "", "pdf_path": "", "jd_path": "", "out_dir": "",
-            "warnings": [], "exp_warning": "", "pdf_error": "",
+            "warnings": [], "exp_warning": "", "sponsorship_warning": "",
+            "pdf_error": "", "url": job.get("url", ""),
+            "location": job.get("location", ""),
             "blocked": False, "ok": False, "error": str(e),
         }

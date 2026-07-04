@@ -2,9 +2,11 @@
 Job Search Assistant — local Streamlit UI.
 
 Tabs:
-  1. Search & Tailor — scrape all job boards, score each job against the profile,
+  1. Search & Tailor — scrape job boards, score each job against the profile,
      queue jobs, and generate tailored resumes.
-  2. Tracker         — track application status.
+  2. Paste JD        — tailor a resume from pasted JD text or a job URL.
+  3. Dashboard       — job-search progress with filters, visuals, and encouragement.
+  4. Tracker         — track application status.
 """
 
 import json
@@ -15,9 +17,13 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 from fit import score_job
-from tailoring import tailor_job, fetch_jd
+from tailoring import tailor_job, fetch_jd, jd_from_url
+
+STATUSES = ["To Apply", "Applied", "Phone Screen", "Interview",
+            "Final Round", "Offer", "Rejected"]
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).parent
@@ -60,6 +66,79 @@ def load_tracker() -> list[dict]:
 
 def save_tracker(rows: list[dict]) -> None:
     TRACKER_FILE.write_text(json.dumps(rows, indent=2))
+
+
+def tracker_has(company: str, role: str) -> bool:
+    c, r = company.lower().strip(), role.lower().strip()
+    return any(row.get("company", "").lower().strip() == c
+               and row.get("role", "").lower().strip() == r
+               for row in load_tracker())
+
+
+def add_application(company: str, role: str, location: str = "", url: str = "",
+                    status: str = "To Apply", notes: str = "") -> bool:
+    """Add a job to the tracker with status 'To Apply'. Returns False if a dup."""
+    if tracker_has(company, role):
+        return False
+    rows = load_tracker()
+    rows.append({
+        "company": company, "role": role, "location": location, "url": url,
+        "date_added": str(date.today()), "status": status, "notes": notes,
+    })
+    save_tracker(rows)
+    return True
+
+
+# ── Shared tailored-result renderer (used by Search and Paste tabs) ──────────
+def render_result(r: dict, key_prefix: str) -> None:
+    company = r.get("company", "")
+    role = r.get("role", "")
+
+    if r.get("blocked"):
+        st.error(f"⛔ **{company} — {role}**: skipped — no sponsorship for F1 "
+                 f"({r.get('block_reason', '')}). Verify in the posting before ruling it out.")
+        return
+    if not r.get("ok"):
+        st.error(f"❌ {company} — {role}: {r.get('error', 'unknown error')}")
+        return
+
+    out_dir = r.get("out_dir") or (str(Path(r["resume_path"]).parent)
+                                   if r.get("resume_path") else "")
+    with st.expander(f"✅ {company} — {role}  ·  {r.get('family', '')}", expanded=True):
+        st.write(f"**Role family detected:** {r.get('family', '')}")
+        if out_dir:
+            st.write(f"**Saved to:** `{out_dir}`")
+        if r.get("sponsorship_warning"):
+            st.warning("⚠️ " + r["sponsorship_warning"])
+        if r.get("exp_warning"):
+            st.warning("⚠️ " + r["exp_warning"])
+        if r.get("warnings"):
+            st.caption("Content trimmed to fit 1 page: " + "; ".join(r["warnings"]))
+        if r.get("pdf_error"):
+            st.warning("PDF not created — " + r["pdf_error"] + " (the DOCX is still saved).")
+
+        dl1, dl2 = st.columns(2)
+        with dl1:
+            if r.get("resume_path"):
+                with open(r["resume_path"], "rb") as f:
+                    st.download_button(
+                        "⬇️ DOCX", data=f, file_name=Path(r["resume_path"]).name,
+                        mime="application/vnd.openxmlformats-officedocument."
+                             "wordprocessingml.document",
+                        key=f"{key_prefix}_docx")
+        with dl2:
+            if r.get("pdf_path"):
+                with open(r["pdf_path"], "rb") as f:
+                    st.download_button(
+                        "⬇️ PDF", data=f, file_name=Path(r["pdf_path"]).name,
+                        mime="application/pdf", key=f"{key_prefix}_pdf")
+
+        if tracker_has(company, role):
+            st.success("✓ In tracker")
+        elif st.button("➕ Add to Tracker", key=f"{key_prefix}_trk"):
+            add_application(company, role, r.get("location", ""), r.get("url", ""),
+                            status="To Apply", notes=f"Resume tailored ({r.get('family', '')})")
+            st.rerun()
 
 
 # ── Scraper ───────────────────────────────────────────────────────────────────
@@ -198,7 +277,8 @@ st.set_page_config(page_title="Job Search Assistant", page_icon="💼", layout="
 st.title("💼 Job Search Assistant")
 st.caption("Shrujal Agarwal — local workflow tool")
 
-tab_search, tab_tracker = st.tabs(["🔍 Search & Tailor", "📊 Tracker"])
+tab_search, tab_paste, tab_dashboard, tab_tracker = st.tabs(
+    ["🔍 Search & Tailor", "📝 Paste JD", "📊 Dashboard", "🗂️ Tracker"])
 
 # ════════════════════════════════════════════════════════════════════════════
 # TAB 1 — SEARCH & TAILOR
@@ -243,6 +323,7 @@ with tab_search:
                 jobs, board_status = run_search(boards, queries, location,
                                                 date_posted, job_type, int(pages))
             st.session_state["jobs"] = jobs
+            st.session_state["tailor_results"] = []  # clear stale tailored results
 
             # Per-board status line (honest about Cloudflare-blocked boards)
             icons = {"ok": "✅", "blocked": "🚫", "error": "⚠️", "empty": "∅"}
@@ -367,71 +448,181 @@ with tab_search:
                 prog.progress(k / n_queued,
                               text=f"Tailoring: {job.get('title', '')[:40]}…")
                 results.append(tailor_job(job))
-            prog.progress(1.0, text="Done.")
             prog.empty()
+            # Persist so the Add-to-Tracker buttons survive reruns.
+            st.session_state["tailor_results"] = results
 
+        # Render tailored results (persisted) — outside the click guard so the
+        # Add-to-Tracker buttons keep working after a rerun.
+        if st.session_state.get("tailor_results"):
             st.subheader("Tailored Resumes")
-            for r in results:
-                company = r.get("company", "")
-                role = r.get("role", "")
-                if r.get("blocked"):
-                    st.error(f"⛔ **{company} — {role}**: skipped — "
-                             f"no sponsorship for F1 ({r.get('block_reason', '')}). "
-                             "Verify in the posting before ruling it out.")
-                elif r.get("ok"):
-                    out_dir = r.get("out_dir") or str(Path(r["resume_path"]).parent)
-                    with st.expander(f"✅ {company} — {role}  ·  {r.get('family', '')}"):
-                        st.write(f"**Role family detected:** {r.get('family', '')}")
-                        st.write(f"**Saved to:** `{out_dir}`")
-                        if r.get("exp_warning"):
-                            st.warning("⚠️ " + r["exp_warning"])
-                        if r.get("warnings"):
-                            st.caption("Content trimmed to fit 1 page: "
-                                       + "; ".join(r["warnings"]))
-                        if r.get("pdf_error"):
-                            st.warning("PDF not created — " + r["pdf_error"]
-                                       + " (the DOCX is still saved).")
-
-                        dl1, dl2 = st.columns(2)
-                        with dl1:
-                            with open(r["resume_path"], "rb") as f:
-                                st.download_button(
-                                    "⬇️ DOCX",
-                                    data=f, file_name=Path(r["resume_path"]).name,
-                                    mime="application/vnd.openxmlformats-officedocument."
-                                         "wordprocessingml.document",
-                                    key=f"dl_docx_{r['resume_path']}")
-                        with dl2:
-                            if r.get("pdf_path"):
-                                with open(r["pdf_path"], "rb") as f:
-                                    st.download_button(
-                                        "⬇️ PDF",
-                                        data=f, file_name=Path(r["pdf_path"]).name,
-                                        mime="application/pdf",
-                                        key=f"dl_pdf_{r['pdf_path']}")
-
-                        if st.button("Add to Tracker", key=f"trk_{r['resume_path']}"):
-                            rows = load_tracker()
-                            rows.append({
-                                "company": company, "role": role,
-                                "location": "", "url": "",
-                                "date_added": str(date.today()),
-                                "status": "To Apply",
-                                "notes": f"Resume tailored ({r.get('family', '')})",
-                            })
-                            save_tracker(rows)
-                            st.success("Added to tracker.")
-                else:
-                    st.error(f"❌ {company} — {role}: {r.get('error', 'unknown error')}")
+            for i, r in enumerate(st.session_state["tailor_results"]):
+                render_result(r, key_prefix=f"search_{i}")
 
 # ════════════════════════════════════════════════════════════════════════════
-# TAB 2 — TRACKER
+# TAB 2 — PASTE JD
+# ════════════════════════════════════════════════════════════════════════════
+with tab_paste:
+    st.header("Tailor from a Pasted JD or Link")
+    st.caption("For a role you found elsewhere. Paste the description (or a link), "
+               "add the company and title, and generate a tailored resume.")
+
+    pc1, pc2 = st.columns(2)
+    with pc1:
+        p_company = st.text_input("Company", key="paste_company",
+                                  placeholder="e.g. Stripe")
+    with pc2:
+        p_role = st.text_input("Role / Job Title", key="paste_role",
+                               placeholder="e.g. Strategy & Operations Manager")
+
+    source = st.radio("Job description source", ["Paste text", "From URL"],
+                      horizontal=True, key="paste_source")
+    p_jd, p_url = "", ""
+    if source == "Paste text":
+        p_jd = st.text_area("Paste the full job description", height=220,
+                            key="paste_jd_text")
+    else:
+        p_url = st.text_input("Job posting URL", key="paste_url",
+                              placeholder="https://…")
+        st.caption("LinkedIn links work best. Some sites (Indeed/Glassdoor and "
+                   "Cloudflare-protected pages) may block reading — paste the text instead.")
+
+    if st.button("🎯 Generate Tailored Resume", type="primary", key="paste_generate"):
+        if not p_company.strip() or not p_role.strip():
+            st.warning("Enter both the company and the role/title.")
+        elif source == "Paste text" and not p_jd.strip():
+            st.warning("Paste the job description text.")
+        elif source == "From URL" and not p_url.strip():
+            st.warning("Enter the job posting URL.")
+        else:
+            with st.spinner("Reading the JD and tailoring…"):
+                jd_text = p_jd
+                if source == "From URL":
+                    jd_text = jd_from_url(p_url)
+                if not jd_text or not jd_text.strip():
+                    st.session_state["paste_result"] = None
+                    st.error("Couldn't read a job description from that URL. "
+                             "Please switch to 'Paste text' and paste it directly.")
+                else:
+                    job = {"title": p_role.strip(), "company": p_company.strip(),
+                           "location": "", "board": "", "id": "",
+                           "url": p_url.strip(), "jd_text": jd_text}
+                    # Don't hard-skip on sponsorship here — warn but still generate.
+                    st.session_state["paste_result"] = tailor_job(
+                        job, enforce_sponsorship=False)
+
+    if st.session_state.get("paste_result"):
+        st.subheader("Tailored Resume")
+        render_result(st.session_state["paste_result"], key_prefix="paste")
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# TAB 3 — DASHBOARD
+# ════════════════════════════════════════════════════════════════════════════
+with tab_dashboard:
+    st.header("Your Job Search Dashboard")
+
+    # Motivational slide-roll (self-contained CSS animation).
+    MESSAGES = [
+        "The light is just around the corner — keep going. 💡",
+        "Every application is a step closer. You've got this! 💪",
+        "Rejection is redirection. The right role is coming. 🌟",
+        "Your breakthrough is one 'yes' away. Keep showing up. 🚀",
+        "Progress over perfection — you're doing great. 🌱",
+        "Someone out there needs exactly what you bring. ✨",
+        "Consistency beats luck. Keep the momentum. 🔥",
+    ]
+    n = len(MESSAGES)
+    dur = n * 3.6  # seconds per full cycle
+    slide_pct = 100 / n
+    slides = "".join(
+        f'<div class="slide" style="animation-delay:{i * dur / n:.2f}s">{m}</div>'
+        for i, m in enumerate(MESSAGES))
+    carousel = f"""
+    <style>
+      .roll-wrap {{
+        position: relative; height: 64px; border-radius: 12px;
+        background: linear-gradient(90deg,#2F5496,#3a63ad);
+        overflow: hidden; font-family: 'Segoe UI',system-ui,sans-serif;
+      }}
+      .slide {{
+        position: absolute; inset: 0; display: flex; align-items: center;
+        justify-content: center; text-align: center; padding: 0 18px;
+        color: #fff; font-size: 18px; font-weight: 600; opacity: 0;
+        animation: roll {dur}s infinite;
+      }}
+      @keyframes roll {{
+        0% {{ opacity: 0; transform: translateY(10px); }}
+        3% {{ opacity: 1; transform: translateY(0); }}
+        {slide_pct - 3:.1f}% {{ opacity: 1; transform: translateY(0); }}
+        {slide_pct:.1f}% {{ opacity: 0; transform: translateY(-10px); }}
+        100% {{ opacity: 0; }}
+      }}
+    </style>
+    <div class="roll-wrap">{slides}</div>
+    """
+    components.html(carousel, height=76)
+
+    rows = load_tracker()
+    if not rows:
+        st.info("No applications tracked yet. Tailor a resume and click "
+                "**Add to Tracker**, or add entries in the Tracker tab.")
+    else:
+        df = pd.DataFrame(rows)
+
+        # Filters
+        f1, f2 = st.columns(2)
+        with f1:
+            companies = sorted(df["company"].dropna().unique().tolist())
+            pick_co = st.multiselect("Filter by company", companies, default=[])
+        with f2:
+            pick_st = st.multiselect("Filter by status", STATUSES, default=[])
+        view = df.copy()
+        if pick_co:
+            view = view[view["company"].isin(pick_co)]
+        if pick_st:
+            view = view[view["status"].isin(pick_st)]
+
+        # Metrics
+        total = len(view)
+        applied = int((view["status"] != "To Apply").sum())
+        interviewing = int(view["status"].isin(
+            ["Phone Screen", "Interview", "Final Round"]).sum())
+        offers = int((view["status"] == "Offer").sum())
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Total tracked", total)
+        m2.metric("Applied", applied)
+        m3.metric("Interviewing", interviewing)
+        m4.metric("Offers", offers)
+
+        # Status breakdown (ordered by pipeline stage)
+        st.subheader("Pipeline by status")
+        counts = (view["status"].value_counts()
+                  .reindex(STATUSES).fillna(0).astype(int))
+        st.bar_chart(counts, horizontal=True, color="#2F5496")
+
+        # Applications over time
+        if "date_added" in view.columns and view["date_added"].notna().any():
+            st.subheader("Applications added over time")
+            ts = view.copy()
+            ts["date_added"] = pd.to_datetime(ts["date_added"], errors="coerce")
+            daily = (ts.dropna(subset=["date_added"])
+                     .groupby(ts["date_added"].dt.date).size().cumsum())
+            if len(daily):
+                st.area_chart(daily, color="#2F5496")
+
+        with st.expander("View filtered applications table"):
+            st.dataframe(
+                view[["company", "role", "status", "date_added", "location"]],
+                hide_index=True, use_container_width=True)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# TAB 4 — TRACKER
 # ════════════════════════════════════════════════════════════════════════════
 with tab_tracker:
     st.header("Application Tracker")
     rows = load_tracker()
-    STATUSES = ["To Apply", "Applied", "Phone Screen", "Interview",
-                "Final Round", "Offer", "Rejected"]
 
     with st.expander("+ Add Application"):
         nc1, nc2 = st.columns(2)
