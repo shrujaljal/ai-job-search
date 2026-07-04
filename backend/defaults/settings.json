@@ -1,0 +1,20 @@
+{
+  "candidate_name": "Your Name",
+  "output_dir": "",
+  "theme": "system",
+  "active_template": "default",
+  "llm": {
+    "enabled": false,
+    "provider": "claude",
+    "model": "claude-sonnet-5",
+    "api_keys": {
+      "claude": "",
+      "openai": ""
+    },
+    "openai_model": "gpt-4o"
+  },
+  "search": {
+    "boards": ["LinkedIn"],
+    "pages_per_board": 1
+  }
+}

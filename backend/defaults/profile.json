@@ -1,0 +1,33 @@
+{
+  "identity": {
+    "name": "Your Name",
+    "email": "you@example.com",
+    "phone": "",
+    "location": "",
+    "links": [{ "label": "LinkedIn", "url": "" }],
+    "work_authorization": "",
+    "needs_sponsorship": false
+  },
+  "summary": "",
+  "education": [
+    {
+      "degree": "", "field": "", "institution": "", "location": "",
+      "graduation": "", "honors": [], "coursework": []
+    }
+  ],
+  "experience": [
+    {
+      "company": "", "role": "", "location": "",
+      "start": "", "end": "", "bullets": [""]
+    }
+  ],
+  "projects": [
+    { "title": "", "bullets": [""], "families": [] }
+  ],
+  "leadership": [
+    { "organization": "", "role": "", "bullets": [""] }
+  ],
+  "skills": [
+    { "category": "", "items": [] }
+  ]
+}

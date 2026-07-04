@@ -2,6 +2,12 @@
 node_modules/
 bun.lock
 
+# V2 front end build output
+frontend/dist/
+
+# V2 back end user data + live config (never commit personal data / API keys)
+backend/data/
+
 # Python
 __pycache__/
 *.pyc

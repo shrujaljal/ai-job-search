@@ -1,0 +1,14 @@
+{
+  "default_family": "General Business",
+  "families": {
+    "General Business": {
+      "summary": "",
+      "coursework": "",
+      "skill_categories": [
+        { "label": "Core", "items": "" }
+      ],
+      "projects": []
+    }
+  },
+  "bullet_library": {}
+}
