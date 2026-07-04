@@ -18,6 +18,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -265,6 +266,18 @@ def put_plan(body: dict) -> dict:
 @app.get("/api/dashboard")
 def get_dashboard() -> dict:
     return store.dashboard()
+
+
+# ── Download a generated résumé file (restricted to the output root) ─────────
+@app.get("/api/download")
+def download(path: str):
+    p = Path(path).resolve()
+    root = _output_root().resolve()
+    if p != root and root not in p.parents:
+        raise HTTPException(403, "File is outside the output directory.")
+    if not p.exists() or not p.is_file():
+        raise HTTPException(404, "File not found.")
+    return FileResponse(str(p), filename=p.name)
 
 
 # ── Serve the built React app in production (if it exists) ────────────────────
