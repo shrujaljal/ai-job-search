@@ -8,13 +8,14 @@ update/delete individual applications.
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 DATA = Path(__file__).resolve().parent / "data"
 OUTPUT = DATA / "output"
 TRACKER = OUTPUT / "tracker.json"
 PLAN = OUTPUT / "daily_plan.json"
+STREAK = OUTPUT / "streak.json"
 
 STATUSES = ["To Apply", "Applied", "Phone Screen", "Interview",
             "Final Round", "Offer", "Rejected"]
@@ -93,6 +94,31 @@ def get_plan() -> dict:
 
 def save_plan(data: dict) -> None:
     _write(PLAN, data)
+    # Completing today's plan counts toward the daily streak.
+    if data.get("done") and data.get("date"):
+        record_activity(data["date"])
+
+
+# ── Streak ────────────────────────────────────────────────────────────────────
+def get_streak() -> dict:
+    return _read(STREAK, {"current": 0, "longest": 0, "last_date": ""})
+
+
+def record_activity(today: str) -> dict:
+    """Mark a completed day; extend the streak if yesterday counted, else reset."""
+    s = get_streak()
+    last = s.get("last_date", "")
+    if last == today:
+        return s  # already counted today
+    try:
+        yesterday = str(date.fromisoformat(today) - timedelta(days=1))
+    except ValueError:
+        yesterday = ""
+    s["current"] = s.get("current", 0) + 1 if last == yesterday else 1
+    s["last_date"] = today
+    s["longest"] = max(s.get("longest", 0), s["current"])
+    _write(STREAK, s)
+    return s
 
 
 # ── Dashboard aggregates ──────────────────────────────────────────────────────
@@ -110,4 +136,5 @@ def dashboard() -> dict:
         "by_status": by_status,
         "applications": rows,
         "statuses": STATUSES,
+        "streak": get_streak(),
     }

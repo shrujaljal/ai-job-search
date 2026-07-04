@@ -48,6 +48,12 @@ export interface Application {
   notes: string
 }
 
+export interface Streak {
+  current: number
+  longest: number
+  last_date: string
+}
+
 export interface Dashboard {
   total: number
   applied: number
@@ -56,6 +62,7 @@ export interface Dashboard {
   by_status: Record<string, number>
   applications: Application[]
   statuses: string[]
+  streak?: Streak
 }
 
 export interface Plan {

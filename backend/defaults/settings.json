@@ -1,7 +1,9 @@
 {
   "candidate_name": "Your Name",
+  "username": "",
   "output_dir": "",
   "theme": "system",
+  "accent": "violet",
   "active_template": "default",
   "llm": {
     "enabled": false,
