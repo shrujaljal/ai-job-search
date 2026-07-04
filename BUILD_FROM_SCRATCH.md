@@ -17,6 +17,12 @@ that were made, what went wrong, how each problem was diagnosed, and how it was
 fixed. Every technical moment is explained the way you'd explain it to a friend
 over coffee.
 
+> **📝 About the prompt boxes.** Each chapter includes one or more **example
+> prompts** — the kind of plain-English request you'd type to Claude Code to make
+> that step happen. They're written to *teach you how to ask*, so they're cleaned-up
+> and representative rather than word-for-word transcripts. Notice the pattern: they
+> describe **what you want to be true**, not how to code it. That's the whole skill.
+
 ---
 
 ## The big picture: how software actually gets built
@@ -53,6 +59,17 @@ means "download the newest copy of the project files." Right away this surfaced 
 the template had changed — old Danish job-search tools were removed and new US ones
 (LinkedIn, Indeed, Glassdoor) were added.
 
+> **💬 Prompts used**
+> ```
+> Can you pull the latest version from git for the ai-job-search project?
+> ```
+> ```
+> Great, what's the next step for me to do?
+> ```
+> *Why these work:* the second one is just as important as the first. Asking the
+> assistant "what should I do next?" turns it into a guide, not just a tool that
+> waits for orders.
+
 **Lesson:** always start a work session by syncing to the latest version, so you're
 not building on top of stale files.
 
@@ -70,6 +87,23 @@ This was pasted in as a series of documents. The assistant condensed all of it i
 one authoritative file, `CLAUDE.md`, which became the **single source of truth**.
 Every later decision — how to score a job, what to put on a résumé — traces back to
 this file.
+
+> **💬 Prompts used**
+> ```
+> I have a lot of content about my background. I'll send you each file one by
+> one. Once you have them all, add the information to the setup file (CLAUDE.md).
+> ```
+> ```
+> [paste each document: identity, work experience, projects, leadership,
+>  skills, the résumé-writing rules, etc.]
+> ```
+> ```
+> I forgot to add one more experience — my Teaching Assistant role. Please add
+> it to the work-experience file too.
+> ```
+> *Why these work:* feeding information in **one chunk at a time** and telling the
+> assistant to hold it until you're done is far more reliable than dumping everything
+> at once. And it's fine to circle back and add something you forgot.
 
 **Lesson:** the quality of everything downstream depends on the quality of this
 profile. Garbage in, garbage out. Time spent here pays off everywhere else.
@@ -98,6 +132,21 @@ Two decisions were made:
   designed Word résumé with a specific table layout, and wanted every generated
   résumé to match it exactly and stay to one page.
 
+> **💬 Prompts used**
+> ```
+> I want to create a UI (a website or a local app) for this workflow where I can
+> initiate the scraping process. I also want the résumé in a very specific
+> structure — I built it in Word using tables. It has to be one page or slightly
+> less. What should be done for this?
+> ```
+> ```
+> For the UI, something that runs entirely locally is fine for now.
+> ```
+> *Why these work:* the first prompt describes the **goal and constraints** ("local
+> app," "specific Word structure," "one page") and then *asks the assistant to
+> propose the approach* — instead of guessing at technology yourself. The follow-up
+> answers the assistant's clarifying question. Let it advise; you decide.
+
 **Lesson:** pick the simplest technology that meets the real requirement. "Runs
 locally, no setup headaches" was worth more here than anything fancier.
 
@@ -115,6 +164,19 @@ To keep it to one page, a separate set of **content rules** was written — limi
 how many bullet points and how many characters per line. If content is too long, the
 rules trim it *before* the document is created, so it never overflows.
 
+> **💬 Prompts used**
+> ```
+> Here's my résumé as a .docx — study its exact layout (the table structure,
+> section headings, fonts, spacing) and build something that can regenerate it
+> automatically from my profile data.
+> ```
+> ```
+> Set up rules so the generated résumé is always one page or slightly less.
+> ```
+> *Why these work:* handing over a **concrete example** ("here's the exact format I
+> want") is worth a thousand words of description. The assistant can inspect the real
+> file and match it precisely.
+
 **Lesson:** break a feature into pieces that each do one job. "Hold the facts,"
 "enforce the length limits," and "draw the document" were three separate pieces. If
 the layout looks wrong, you know to look at the drawing piece, not the others.
@@ -127,6 +189,16 @@ The job-search tools ("scrapers" — programs that read job listings from a webs
 were written in a different programming language (TypeScript) and run by a tool
 called **Bun**. The first time the user clicked "Search Jobs," it failed with a
 confusing error about a missing module.
+
+> **💬 Prompt used**
+> ```
+> I get this error when I click "Search Jobs":
+> [paste the exact error message]
+> ```
+> *Why this works:* when something breaks, **paste the exact error text**. You don't
+> need to interpret it — the assistant reads the error, figures out the cause, and
+> fixes it. Copy-pasting the real message beats describing it ("it says something
+> about a module").
 
 **What was actually wrong (in plain terms):** software is built from many small
 reusable parts, like ingredients. These tools listed their ingredients but the
@@ -146,6 +218,12 @@ which piece is confused, and adjust.
 everything in one command, so this "missing ingredients" problem could never bite
 again on a fresh machine.
 
+> **💬 Prompt used**
+> ```
+> Can you create a setup file I can run once that installs everything the app
+> needs, so I don't have to remember all these commands?
+> ```
+
 ---
 
 ## Chapter 5 — Making the résumé match a real folder structure
@@ -157,6 +235,16 @@ Downloads / 2026 / <Company> / <Role> /
     <Role>.docx
     Shrujal Agarwal.pdf
 ```
+
+> **💬 Prompt used**
+> ```
+> I want the résumé in both DOCX and PDF. Save them under Downloads/2026: create
+> a folder for the company, inside it a folder for the role, and put the files
+> there. Name the DOCX after the role and name the PDF "Shrujal Agarwal".
+> ```
+> *Why this works:* it's **precise about the outcome** — exact folder nesting, exact
+> file names, both formats. When you have a specific requirement, spell it out fully;
+> the assistant will match it exactly.
 
 Two interesting things happened here:
 
@@ -192,6 +280,19 @@ The catch: reading each posting individually is slower. The solution was to read
 of them **at the same time** (in parallel) rather than one after another, so a page
 of results still finishes in a few seconds instead of a minute.
 
+> **💬 Prompts used**
+> ```
+> How is the fit score generated? Is it looking at the full job description?
+> ```
+> ```
+> This needs to change — the fit score should be based on parsing the actual job
+> description. Only then can we get a realistic score.
+> ```
+> *Why these work:* the first prompt is a **question, not a command** — asking the
+> assistant to explain how something currently works. Understanding the "before" led
+> directly to a well-aimed "make it better." Don't be afraid to ask "how does this
+> work right now?" before asking for a change.
+
 **Lesson:** there's often a trade-off between "fast and shallow" and "slow and
 accurate." When accuracy matters, you pay for it with time — but clever techniques
 (like doing things in parallel) buy a lot of that time back.
@@ -211,6 +312,17 @@ events" (a job duty) is not about visas at all. The detection was written and th
 tested against a list of tricky examples to make sure it caught the real blockers and
 ignored the innocent ones.
 
+> **💬 Prompt used**
+> ```
+> Also check the job description for things like "no sponsorship," "not eligible
+> for immigrants," or ITAR requirements. There's no point applying to those — I'm
+> an F1 student and visa sponsorship is essential. Also make sure the required
+> experience isn't more than 3–4 years, since I'm early-career.
+> ```
+> *Why this works:* it shares the **real-world "why"** ("I'm an F1 student"), not just
+> the "what." When the assistant understands the reason behind a rule, it makes better
+> judgment calls about the tricky in-between cases.
+
 **Lesson:** encode the user's real-world constraints into the tool, and then
 **test your logic against edge cases** — especially the ones designed to trip it up.
 A filter that cries wolf is worse than no filter.
@@ -229,12 +341,27 @@ as a single **image on a canvas**, not as normal clickable web text, so its link
 weren't really clickable. The fix was to also list the job links as normal,
 guaranteed-clickable text below the table.
 
+> **💬 Prompt used**
+> ```
+> The links to the job postings aren't working. Even right-click to copy the link
+> is disabled.
+> ```
+
 ### "It's *still* not working!"
 The links still failed — but this time for a completely different reason. The user was
 viewing the app inside a **sandboxed preview pane** (a walled-off test window) that
 blocks any link leaving to the outside internet. The app itself was fine. The fix was
 simply to open the app in a **real browser window**. Nothing to code — just
 understanding *where* the problem actually lived.
+
+> **💬 Prompt used**
+> ```
+> It's still the same — the link says it was blocked and only supports localhost.
+> ```
+> *Why this matters:* the user reported the *new* symptom precisely, which let the
+> assistant realize the problem had **moved** (from the app to the viewing window).
+> Describe exactly what you see; small wording differences ("blocked," "localhost")
+> are clues.
 
 **Lesson:** "it doesn't work" can have two totally different causes that look
 identical. Always ask *where* the failure is happening, not just *what* is failing.
@@ -268,6 +395,16 @@ so when you clicked it, the app re-ran, that block didn't execute, and the butto
 its action) vanished before doing anything. The fix was to **remember the results**
 separately so the buttons keep existing across re-runs.
 
+> **💬 Prompt used**
+> ```
+> The "Add to Tracker" feature isn't working. Once a résumé is created I click the
+> button, but nothing happens. This needs to be fixed. Also, once a job is added,
+> its status should be "To Apply," and I'll change it to "Applied" manually later.
+> ```
+> *Why this works:* it describes the **exact broken behavior** ("I click, nothing
+> happens") *and* the desired end-state ("status should be To Apply"). One prompt,
+> both the bug and the intended behavior.
+
 **Lesson:** understanding *how your tool behaves* (here: "it re-runs everything on
 every click") is often the key to fixing a baffling bug.
 
@@ -292,6 +429,15 @@ and handle it gracefully instead of crashing.
 
 The user double-clicked the launcher and got "No module named streamlit" — even
 though everything had been installed and tested successfully many times.
+
+> **💬 Prompt used**
+> ```
+> I get this error when I run the launcher:
+> C:\Python314\python.exe: No module named streamlit
+> ```
+> *Why this works:* again — **paste the exact error**. The specific path in the
+> message (`C:\Python314`) was the crucial clue that revealed *which* Python was being
+> used, which cracked the whole mystery.
 
 **What was really going on:** the computer had **two copies of Python** installed (the
 programming language the app runs on). The ingredients were installed into one copy,
@@ -318,6 +464,20 @@ Software people will actually use needs to feel effortless to launch. So:
 - A custom **"J" icon** was drawn in code (a white J on the app's blue).
 - A **desktop shortcut** and Start-Menu entry were created automatically.
 
+> **💬 Prompts used**
+> ```
+> Can I have a file I can double-click to start the app, instead of using the
+> terminal every time?
+> ```
+> ```
+> Rename it to "Job application agent" and use a "J" letter for the icon. Put a
+> launcher on the desktop and pin it to the taskbar.
+> ```
+> *Why these work:* they focus on the **experience the user wants** ("double-click,"
+> "on the desktop," a "J" icon) and leave the assistant to figure out the mechanics
+> (batch files, icon files, shortcut scripts) — and to tell you honestly when the OS
+> won't allow part of it (the taskbar pin).
+
 The user also asked to **pin it to the taskbar**. Here we hit another honest wall:
 **Windows 11 deliberately forbids apps from pinning themselves to the taskbar** (a
 security rule). Rather than fight it with fragile hacks, the shortcut was set up so
@@ -338,6 +498,20 @@ Then the user made a wise call: *"if the simple version already works, don't
 complicate things."* They were right — the data had been safely saved to a simple file
 all along; the earlier confusion was because the file had been reset during testing.
 The database was **reverted** (undone), returning to the simpler file-based storage.
+
+> **💬 Prompts used**
+> ```
+> If the dashboard numbers refresh every time, that defeats the purpose. Set up a
+> database to store the tracking data — or suggest the best approach.
+> ```
+> ```
+> Let's revert to the simpler version. I thought the data wasn't being saved. If
+> it already works, no need for the database — don't complicate things.
+> ```
+> *Why these work:* the first again **asks for a recommendation** ("or suggest the
+> best approach"). The second is the most valuable prompt in the whole project — the
+> user felt free to say **"actually, undo that."** Reversing course is a normal,
+> healthy part of building. Say it whenever you feel it.
 
 Because every change was a Git checkpoint, undoing this was a single clean command
 with zero risk.
@@ -360,6 +534,23 @@ With the machine working, attention turned to how it *feels*:
   nudge, and celebrate when you complete it.
 - The encouragement was **personalized** to greet the user by name ("You've got this,
   Shrujal!").
+
+> **💬 Prompts used**
+> ```
+> The landing page should be the Dashboard. Tab order: Dashboard | Tracker |
+> Search & Tailor | Paste JD. Also, on the dashboard, ask me what my plan is for
+> the day and motivate me to achieve it.
+> ```
+> ```
+> Use my name in the messages. E.g. "You can do this, Shrujal. You are the
+> best 💪."
+> ```
+> ```
+> Tag this release as v1.0. I have many ideas for the next version.
+> ```
+> *Why these work:* by this stage the prompts are about **feel and delight** — order,
+> tone, personalization. Details like these cost little and matter a lot for whether a
+> tool feels yours.
 
 Small, human touches like these are what make a tool something you *want* to open.
 
