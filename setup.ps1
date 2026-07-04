@@ -7,13 +7,36 @@ $root = $PSScriptRoot
 
 Write-Host "=== Job Search Assistant Setup ===" -ForegroundColor Cyan
 
-# --- 1. Python packages ------------------------------------------------------
-Write-Host "`n[1/3] Installing Python packages (streamlit, python-docx, lxml, pywin32, Pillow)..." -ForegroundColor Yellow
-python -m pip install --quiet python-docx streamlit lxml pywin32 Pillow
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "  Python packages installed." -ForegroundColor Green
+# --- 1. Virtual environment + Python packages --------------------------------
+Write-Host "`n[1/3] Setting up virtual environment (.venv) and Python packages..." -ForegroundColor Yellow
+
+$venvPy = Join-Path $root ".venv\Scripts\python.exe"
+
+# Find a base Python to create the venv (prefer the 'py' launcher, else 'python').
+$basePy = $null
+if (Get-Command py -ErrorAction SilentlyContinue) { $basePy = "py" }
+elseif (Get-Command python -ErrorAction SilentlyContinue) { $basePy = "python" }
+
+if (-not (Test-Path $venvPy)) {
+    if (-not $basePy) {
+        Write-Host "  Python not found on PATH. Install Python 3 from python.org, then re-run." -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "  Creating .venv ..." -ForegroundColor DarkGray
+    & $basePy -m venv (Join-Path $root ".venv")
+}
+
+if (Test-Path $venvPy) {
+    & $venvPy -m pip install --quiet --upgrade pip
+    & $venvPy -m pip install --quiet python-docx streamlit lxml pywin32 Pillow
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  Python packages installed into .venv." -ForegroundColor Green
+    } else {
+        Write-Host "  Python package install failed." -ForegroundColor Red
+    }
 } else {
-    Write-Host "  Python package install failed." -ForegroundColor Red
+    Write-Host "  Could not create .venv." -ForegroundColor Red
+    exit 1
 }
 
 # --- 2. Scraper CLI dependencies (Bun) ---------------------------------------
@@ -49,7 +72,7 @@ Write-Host "`n[3/3] Creating desktop launcher and shortcuts..." -ForegroundColor
 $icon = Join-Path $root "assets\job_app_agent.ico"
 if (-not (Test-Path $icon)) {
     Write-Host "  Generating J icon..." -ForegroundColor DarkGray
-    try { python (Join-Path $root "assets\make_icon.py") | Out-Null } catch {}
+    try { & $venvPy (Join-Path $root "assets\make_icon.py") | Out-Null } catch {}
 }
 
 $mkShortcuts = Join-Path $root "assets\make_shortcuts.ps1"
