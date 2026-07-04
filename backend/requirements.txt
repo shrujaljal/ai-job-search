@@ -9,3 +9,7 @@ python-multipart>=0.0.9   # file uploads (custom résumé templates)
 # LLM providers (used only when AI tailoring is enabled)
 anthropic>=0.40
 openai>=1.40
+
+# Windows-only: lets us render PDF via MS Word when LibreOffice isn't installed.
+# On macOS/Linux, PDF is produced by LibreOffice headless (a documented prereq).
+pywin32>=306; sys_platform == "win32"

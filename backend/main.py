@@ -21,9 +21,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+import re
+
 import config
 import scoring
 import scrapers
+import store
+import resume_builder
+import resume_render
 
 app = FastAPI(title="Job Application Agent API", version="2.0.0-dev")
 
@@ -130,6 +135,136 @@ def search(req: SearchRequest) -> dict:
                    "scored_on_jd": sum(1 for j in unique if j.get("scored_on_jd")),
                    "blocked": sum(1 for j in unique if j.get("blocked"))},
     }
+
+
+# ── Tailor a résumé (from a job or pasted JD) ────────────────────────────────
+_INVALID = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def _safe(name: str, maxlen: int = 120) -> str:
+    name = _INVALID.sub("", name or "").strip()
+    name = re.sub(r"\s+", " ", name).rstrip(". ")
+    return name[:maxlen].strip() or "Untitled"
+
+
+def _output_root() -> Path:
+    settings = config.load("settings")
+    custom = (settings.get("output_dir") or "").strip()
+    return Path(custom) if custom else (Path.home() / "JobApplications")
+
+
+class TailorRequest(BaseModel):
+    company: str
+    role: str
+    jd_text: str = ""
+    job_id: str = ""       # LinkedIn id/url to fetch the JD if jd_text is empty
+    location: str = ""
+    enforce_sponsorship: bool = False
+
+
+@app.post("/api/tailor")
+def tailor(req: TailorRequest) -> dict:
+    if not req.company.strip() or not req.role.strip():
+        raise HTTPException(400, "Company and role are required.")
+    rules = config.load("rules")
+    profile = config.load("profile")
+    content = config.load("resume_content")
+    settings = config.load("settings")
+
+    jd_text = req.jd_text or (scrapers.fetch_jd(req.job_id) if req.job_id else "")
+
+    blocked, sp_matched = scoring.analyze_sponsorship(jd_text, rules)
+    if blocked and req.enforce_sponsorship:
+        return {"ok": True, "blocked": True, "company": req.company, "role": req.role,
+                "block_reason": ", ".join(sp_matched)}
+
+    family, _ = scoring.detect_family(req.role, jd_text, rules)
+    ctx = resume_builder.build_context(profile, content, family)
+
+    out_dir = _output_root() / _safe(req.company) / _safe(req.role)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    role_name = _safe(req.role)
+    candidate = (profile.get("identity", {}).get("name")
+                 or settings.get("candidate_name") or "Resume")
+    docx_path = out_dir / f"{role_name}.docx"
+    pdf_path = out_dir / f"{_safe(candidate)}.pdf"
+
+    resume_render.render_docx(ctx, str(docx_path))
+    pdf_error = ""
+    try:
+        resume_render.docx_to_pdf(docx_path, pdf_path)
+    except Exception as e:  # PDF is best-effort (needs LibreOffice / Word)
+        pdf_error = str(e)
+        pdf_path = None
+
+    exp_warning = ""
+    max_years = int(rules.get("max_years_experience", 4))
+    my = scoring.extract_min_years(jd_text)
+    if my is not None and my > max_years:
+        exp_warning = f"This role asks for {my}+ years of experience."
+
+    return {
+        "ok": True, "blocked": False, "company": req.company, "role": req.role,
+        "family": family, "out_dir": str(out_dir),
+        "docx_path": str(docx_path), "pdf_path": str(pdf_path) if pdf_path else "",
+        "warnings": ctx.get("warnings", []),
+        "sponsorship_warning": (", ".join(sp_matched) if blocked else ""),
+        "exp_warning": exp_warning, "pdf_error": pdf_error,
+    }
+
+
+# ── Tracker ──────────────────────────────────────────────────────────────────
+class NewApplication(BaseModel):
+    company: str
+    role: str
+    location: str = ""
+    url: str = ""
+    status: str = "To Apply"
+    notes: str = ""
+
+
+@app.get("/api/applications")
+def get_applications() -> list[dict]:
+    return store.list_applications()
+
+
+@app.post("/api/applications")
+def create_application(app_in: NewApplication) -> dict:
+    row = store.add_application(**app_in.model_dump())
+    if row is None:
+        raise HTTPException(409, "That company + role is already tracked.")
+    return row
+
+
+@app.patch("/api/applications/{app_id}")
+def patch_application(app_id: int, fields: dict) -> dict:
+    if not store.update_application(app_id, fields):
+        raise HTTPException(404, "Application not found.")
+    return {"updated": True}
+
+
+@app.delete("/api/applications/{app_id}")
+def remove_application(app_id: int) -> dict:
+    if not store.delete_application(app_id):
+        raise HTTPException(404, "Application not found.")
+    return {"deleted": True}
+
+
+# ── Daily plan + dashboard ───────────────────────────────────────────────────
+@app.get("/api/plan")
+def get_plan() -> dict:
+    return store.get_plan()
+
+
+@app.put("/api/plan")
+def put_plan(body: dict) -> dict:
+    store.save_plan(body)
+    return {"saved": True}
+
+
+@app.get("/api/dashboard")
+def get_dashboard() -> dict:
+    return store.dashboard()
 
 
 # ── Serve the built React app in production (if it exists) ────────────────────
