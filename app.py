@@ -648,31 +648,52 @@ with tab_tracker:
     if not rows:
         st.info("No applications tracked yet.")
     else:
-        icons = {"To Apply": "🔵", "Applied": "🟡", "Phone Screen": "🟠",
-                 "Interview": "🟣", "Final Round": "🔴", "Offer": "🟢", "Rejected": "⚫"}
-        for i, row in enumerate(rows):
-            icon = icons.get(row.get("status", ""), "⚪")
-            with st.expander(f"{icon} {row['company']} — {row['role']}"):
-                c1, c2, c3 = st.columns([2, 2, 1])
-                with c1:
-                    st.write(f"**Location:** {row.get('location', '')}")
-                    st.write(f"**Added:** {row.get('date_added', '')}")
-                    if row.get("url"):
-                        st.markdown(f"[Job Posting]({row['url']})")
-                with c2:
-                    new_status = st.selectbox(
-                        "Status", STATUSES,
-                        index=STATUSES.index(row.get("status", "To Apply")),
-                        key=f"status_{i}")
-                    new_notes = st.text_input("Notes", value=row.get("notes", ""),
-                                              key=f"notes_{i}")
-                with c3:
-                    if st.button("Save", key=f"save_{i}"):
-                        rows[i]["status"] = new_status
-                        rows[i]["notes"] = new_notes
-                        save_tracker(rows)
-                        st.success("Saved.")
-                    if st.button("Remove", key=f"remove_{i}"):
-                        rows.pop(i)
-                        save_tracker(rows)
-                        st.rerun()
+        st.caption("Edit **Status** or **Notes** right in the table, tick **🗑** to "
+                   "delete a row, then click **Save changes**.")
+
+        tdf = pd.DataFrame([{
+            "Company": r.get("company", ""),
+            "Role": r.get("role", ""),
+            "Status": r.get("status", "To Apply"),
+            "Location": r.get("location", ""),
+            "Added": r.get("date_added", ""),
+            "Notes": r.get("notes", ""),
+            "🗑": False,
+        } for r in rows])
+
+        edited = st.data_editor(
+            tdf, hide_index=True, use_container_width=True, height=430,
+            column_config={
+                "Company": st.column_config.TextColumn("Company", width="small"),
+                "Role": st.column_config.TextColumn("Role", width="medium"),
+                "Status": st.column_config.SelectboxColumn(
+                    "Status", options=STATUSES, width="small", required=True),
+                "Location": st.column_config.TextColumn("Location", width="small"),
+                "Added": st.column_config.TextColumn("Added", width="small"),
+                "Notes": st.column_config.TextColumn("Notes", width="large"),
+                "🗑": st.column_config.CheckboxColumn(
+                    "🗑", width="small", help="Tick to delete this row on Save"),
+            },
+            disabled=["Company", "Role", "Location", "Added"],
+            key="tracker_editor",
+        )
+
+        b1, b2, _ = st.columns([1, 1, 3])
+        with b1:
+            if st.button("💾 Save changes", type="primary"):
+                new_rows = []
+                for idx, r in enumerate(rows):
+                    e = edited.iloc[idx]
+                    if bool(e["🗑"]):
+                        continue
+                    r["status"] = e["Status"]
+                    r["notes"] = e["Notes"]
+                    new_rows.append(r)
+                save_tracker(new_rows)
+                st.success("Saved.")
+                st.rerun()
+        with b2:
+            export_df = pd.DataFrame(rows)
+            st.download_button(
+                "⬇️ Export CSV", data=export_df.to_csv(index=False),
+                file_name="applications.csv", mime="text/csv")
