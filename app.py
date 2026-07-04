@@ -68,6 +68,23 @@ def save_tracker(rows: list[dict]) -> None:
     TRACKER_FILE.write_text(json.dumps(rows, indent=2))
 
 
+# ── Daily plan persistence ────────────────────────────────────────────────────
+PLAN_FILE = ROOT / "output" / "daily_plan.json"
+
+
+def load_plan() -> dict:
+    if PLAN_FILE.exists():
+        try:
+            return json.loads(PLAN_FILE.read_text())
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+
+def save_plan(data: dict) -> None:
+    PLAN_FILE.write_text(json.dumps(data, indent=2))
+
+
 def tracker_has(company: str, role: str) -> bool:
     c, r = company.lower().strip(), role.lower().strip()
     return any(row.get("company", "").lower().strip() == c
@@ -277,8 +294,8 @@ st.set_page_config(page_title="Job Search Assistant", page_icon="💼", layout="
 st.title("💼 Job Search Assistant")
 st.caption("Shrujal Agarwal — local workflow tool")
 
-tab_search, tab_paste, tab_dashboard, tab_tracker = st.tabs(
-    ["🔍 Search & Tailor", "📝 Paste JD", "📊 Dashboard", "🗂️ Tracker"])
+tab_dashboard, tab_tracker, tab_search, tab_paste = st.tabs(
+    ["📊 Dashboard", "🗂️ Tracker", "🔍 Search & Tailor", "📝 Paste JD"])
 
 # ════════════════════════════════════════════════════════════════════════════
 # TAB 1 — SEARCH & TAILOR
@@ -562,6 +579,49 @@ with tab_dashboard:
     <div class="roll-wrap">{slides}</div>
     """
     components.html(carousel, height=76)
+
+    # ── Today's plan ─────────────────────────────────────────────────────────
+    today = str(date.today())
+    plan = load_plan()
+    todays = plan if plan.get("date") == today else {}
+
+    st.subheader("📋 Today's Plan")
+    if not todays.get("plan"):
+        st.write("**What's your plan for today?** Set a clear, achievable target "
+                 "and go after it.")
+        plan_text = st.text_area(
+            "Today's plan", key="plan_input", height=90, label_visibility="collapsed",
+            placeholder="e.g. Apply to 5 target roles, follow up with 2 recruiters, "
+                        "tailor 3 resumes.")
+        if st.button("💪 Set my plan", type="primary"):
+            if plan_text.strip():
+                save_plan({"date": today, "plan": plan_text.strip(), "done": False})
+                st.rerun()
+            else:
+                st.warning("Write a quick plan first — even one line counts.")
+    elif todays.get("done"):
+        st.success(f"🎉 **You did it!** Today's plan: _{todays['plan']}_")
+        st.markdown("You showed up and followed through. That's how momentum is "
+                    "built — one focused day at a time. Rest up and go again tomorrow. 🌟")
+        if st.button("Edit today's plan"):
+            save_plan({"date": today, "plan": todays["plan"], "done": False})
+            st.rerun()
+    else:
+        st.info(f"**Today's focus:** {todays['plan']}")
+        st.markdown("You've set your intention — now break it into small steps and "
+                    "knock them out one by one. Every action moves you closer. "
+                    "**You can do this!** 💪🚀")
+        pc1, pc2 = st.columns([1, 1])
+        with pc1:
+            if st.button("✅ Mark today's plan complete"):
+                save_plan({"date": today, "plan": todays["plan"], "done": True})
+                st.rerun()
+        with pc2:
+            if st.button("✏️ Change plan"):
+                save_plan({})
+                st.rerun()
+
+    st.divider()
 
     rows = load_tracker()
     if not rows:
