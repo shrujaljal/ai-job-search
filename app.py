@@ -12,6 +12,7 @@ Tabs:
 import json
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
@@ -20,14 +21,9 @@ import streamlit.components.v1 as components
 
 from fit import score_job
 from tailoring import tailor_job, fetch_jd, jd_from_url
-import tracker_db
-from tracker_db import (list_applications, has_application, add_application,
-                        update_application, delete_application)
 
 STATUSES = ["To Apply", "Applied", "Phone Screen", "Interview",
             "Final Round", "Offer", "Rejected"]
-
-tracker_db.init_db()
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).parent
@@ -37,6 +33,7 @@ CLI_ROOTS = {
     "Glassdoor": ROOT / ".agents/skills/glassdoor-search/cli",
 }
 ALL_BOARDS = list(CLI_ROOTS.keys())
+TRACKER_FILE = ROOT / "output" / "tracker.json"
 OUTPUT_DIR = ROOT / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 
@@ -58,6 +55,38 @@ TARGET_ROLES = [
     "Operational Excellence",
     "Chief of Staff",
 ]
+
+
+# ── Tracker persistence ───────────────────────────────────────────────────────
+def load_tracker() -> list[dict]:
+    if TRACKER_FILE.exists():
+        return json.loads(TRACKER_FILE.read_text())
+    return []
+
+
+def save_tracker(rows: list[dict]) -> None:
+    TRACKER_FILE.write_text(json.dumps(rows, indent=2))
+
+
+def tracker_has(company: str, role: str) -> bool:
+    c, r = company.lower().strip(), role.lower().strip()
+    return any(row.get("company", "").lower().strip() == c
+               and row.get("role", "").lower().strip() == r
+               for row in load_tracker())
+
+
+def add_application(company: str, role: str, location: str = "", url: str = "",
+                    status: str = "To Apply", notes: str = "") -> bool:
+    """Add a job to the tracker with status 'To Apply'. Returns False if a dup."""
+    if tracker_has(company, role):
+        return False
+    rows = load_tracker()
+    rows.append({
+        "company": company, "role": role, "location": location, "url": url,
+        "date_added": str(date.today()), "status": status, "notes": notes,
+    })
+    save_tracker(rows)
+    return True
 
 
 # ── Shared tailored-result renderer (used by Search and Paste tabs) ──────────
@@ -104,7 +133,7 @@ def render_result(r: dict, key_prefix: str) -> None:
                         "⬇️ PDF", data=f, file_name=Path(r["pdf_path"]).name,
                         mime="application/pdf", key=f"{key_prefix}_pdf")
 
-        if has_application(company, role):
+        if tracker_has(company, role):
             st.success("✓ In tracker")
         elif st.button("➕ Add to Tracker", key=f"{key_prefix}_trk"):
             add_application(company, role, r.get("location", ""), r.get("url", ""),
@@ -534,7 +563,7 @@ with tab_dashboard:
     """
     components.html(carousel, height=76)
 
-    rows = list_applications()
+    rows = load_tracker()
     if not rows:
         st.info("No applications tracked yet. Tailor a resume and click "
                 "**Add to Tracker**, or add entries in the Tracker tab.")
@@ -593,9 +622,7 @@ with tab_dashboard:
 # ════════════════════════════════════════════════════════════════════════════
 with tab_tracker:
     st.header("Application Tracker")
-    st.caption("Stored in a local SQLite database (output/tracker.db) — persists "
-               "across restarts.")
-    rows = list_applications()
+    rows = load_tracker()
 
     with st.expander("+ Add Application"):
         nc1, nc2 = st.columns(2)
@@ -608,12 +635,13 @@ with tab_tracker:
             t_status = st.selectbox("Status", STATUSES, key="t_status")
             t_notes = st.text_input("Notes", key="t_notes")
         if st.button("Add Entry"):
-            if not t_company or not t_role:
-                st.warning("Company and Role are required.")
-            elif not add_application(t_company, t_role, t_location, t_url,
-                                     t_status, t_notes):
-                st.warning("That company + role is already in the tracker.")
-            else:
+            if t_company and t_role:
+                rows.append({
+                    "company": t_company, "role": t_role, "location": t_location,
+                    "url": t_url, "date_added": str(date.today()),
+                    "status": t_status, "notes": t_notes,
+                })
+                save_tracker(rows)
                 st.success("Added.")
                 st.rerun()
 
@@ -653,20 +681,19 @@ with tab_tracker:
         b1, b2, _ = st.columns([1, 1, 3])
         with b1:
             if st.button("💾 Save changes", type="primary"):
-                changed = 0
+                new_rows = []
                 for idx, r in enumerate(rows):
                     e = edited.iloc[idx]
                     if bool(e["🗑"]):
-                        delete_application(r["id"])
-                        changed += 1
-                    elif e["Status"] != r["status"] or e["Notes"] != r["notes"]:
-                        update_application(r["id"], status=e["Status"],
-                                           notes=e["Notes"])
-                        changed += 1
-                st.success(f"Saved ({changed} change(s)).")
+                        continue
+                    r["status"] = e["Status"]
+                    r["notes"] = e["Notes"]
+                    new_rows.append(r)
+                save_tracker(new_rows)
+                st.success("Saved.")
                 st.rerun()
         with b2:
-            export_df = pd.DataFrame(rows).drop(columns=["id"], errors="ignore")
+            export_df = pd.DataFrame(rows)
             st.download_button(
                 "⬇️ Export CSV", data=export_df.to_csv(index=False),
                 file_name="applications.csv", mime="text/csv")
