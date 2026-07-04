@@ -541,13 +541,14 @@ with tab_dashboard:
 
     # Motivational slide-roll (self-contained CSS animation).
     MESSAGES = [
-        "The light is just around the corner — keep going. 💡",
-        "Every application is a step closer. You've got this! 💪",
-        "Rejection is redirection. The right role is coming. 🌟",
-        "Your breakthrough is one 'yes' away. Keep showing up. 🚀",
-        "Progress over perfection — you're doing great. 🌱",
-        "Someone out there needs exactly what you bring. ✨",
-        "Consistency beats luck. Keep the momentum. 🔥",
+        "The light is just around the corner, Shrujal — keep going. 💡",
+        "Every application is a step closer. You've got this, Shrujal! 💪",
+        "Rejection is redirection. The right role is coming, Shrujal. 🌟",
+        "Your breakthrough is one 'yes' away. Keep showing up, Shrujal. 🚀",
+        "Progress over perfection — you're doing great, Shrujal. 🌱",
+        "Someone out there needs exactly what you bring, Shrujal. ✨",
+        "Consistency beats luck. Keep the momentum, Shrujal. 🔥",
+        "You are the best, Shrujal — believe it and keep pushing. 🏆",
     ]
     n = len(MESSAGES)
     dur = n * 3.6  # seconds per full cycle
@@ -587,8 +588,8 @@ with tab_dashboard:
 
     st.subheader("📋 Today's Plan")
     if not todays.get("plan"):
-        st.write("**What's your plan for today?** Set a clear, achievable target "
-                 "and go after it.")
+        st.write("**What's your plan for today, Shrujal?** Set a clear, achievable "
+                 "target and go after it.")
         plan_text = st.text_area(
             "Today's plan", key="plan_input", height=90, label_visibility="collapsed",
             placeholder="e.g. Apply to 5 target roles, follow up with 2 recruiters, "
@@ -598,19 +599,20 @@ with tab_dashboard:
                 save_plan({"date": today, "plan": plan_text.strip(), "done": False})
                 st.rerun()
             else:
-                st.warning("Write a quick plan first — even one line counts.")
+                st.warning("Write a quick plan first, Shrujal — even one line counts.")
     elif todays.get("done"):
-        st.success(f"🎉 **You did it!** Today's plan: _{todays['plan']}_")
+        st.success(f"🎉 **You did it, Shrujal!** Today's plan: _{todays['plan']}_")
         st.markdown("You showed up and followed through. That's how momentum is "
-                    "built — one focused day at a time. Rest up and go again tomorrow. 🌟")
+                    "built — one focused day at a time. So proud of you, Shrujal. "
+                    "Rest up and go again tomorrow. 🌟")
         if st.button("Edit today's plan"):
             save_plan({"date": today, "plan": todays["plan"], "done": False})
             st.rerun()
     else:
         st.info(f"**Today's focus:** {todays['plan']}")
-        st.markdown("You've set your intention — now break it into small steps and "
-                    "knock them out one by one. Every action moves you closer. "
-                    "**You can do this!** 💪🚀")
+        st.markdown("You've set your intention, Shrujal — now break it into small "
+                    "steps and knock them out one by one. Every action moves you "
+                    "closer. **You can do this, Shrujal!** 💪🚀")
         pc1, pc2 = st.columns([1, 1])
         with pc1:
             if st.button("✅ Mark today's plan complete"):
