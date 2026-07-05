@@ -20,11 +20,31 @@ async function req<T>(path: string, method = 'GET', body?: unknown): Promise<T> 
 }
 
 export interface Health { status: string; version: string }
-export interface Settings { candidate_name: string; theme: string; [k: string]: unknown }
+export interface Settings {
+  candidate_name: string
+  username: string
+  output_dir: string
+  theme: string
+  accent: string
+  active_template: string
+  llm: {
+    enabled: boolean
+    provider: string
+    model: string
+    openai_model: string
+    api_keys: { claude: string; openai: string }
+  }
+  search: { boards: string[]; pages_per_board: number }
+  [k: string]: unknown
+}
 
 export const api = {
   health: () => req<Health>('/health'),
   getSettings: () => req<Settings>('/config/settings'),
+
+  getConfig: <T = Record<string, unknown>>(name: string) => req<T>(`/config/${name}`),
+  putConfig: (name: string, data: unknown) => req<{ saved: boolean }>(`/config/${name}`, 'PUT', data),
+  resetConfig: <T = Record<string, unknown>>(name: string) => req<T>(`/config/${name}/reset`, 'POST'),
 
   search: (payload: {
     roles: string[]; location: string; date_posted: string

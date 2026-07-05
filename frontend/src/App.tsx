@@ -3,19 +3,13 @@ import { useQuery } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { api, type Health } from './api'
 import { ThemeControls } from './components/ThemeControls'
-import { Card } from './components/ui'
 import Dashboard from './pages/Dashboard'
 import Tracker from './pages/Tracker'
 import Search from './pages/Search'
 import PasteJD from './pages/PasteJD'
+import Settings from './pages/Settings'
 
-const SETTINGS_PAGE = {
-  key: 'settings', label: 'Settings', icon: '⚙️', el: (
-    <Card><h1 className="text-xl font-semibold">Settings</h1>
-      <p className="mt-2 text-sm text-slate-500">Coming in Phase 3 — edit your profile, scoring rules, résumé content, templates, and AI provider here.</p>
-    </Card>
-  ),
-}
+const SETTINGS_PAGE = { key: 'settings', label: 'Settings', icon: '⚙️', el: <Settings /> }
 
 const TABS = [
   { key: 'dashboard', label: 'Dashboard', icon: '📊', el: <Dashboard /> },
