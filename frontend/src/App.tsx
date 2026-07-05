@@ -9,19 +9,22 @@ import Tracker from './pages/Tracker'
 import Search from './pages/Search'
 import PasteJD from './pages/PasteJD'
 
-const PAGES = [
+const SETTINGS_PAGE = {
+  key: 'settings', label: 'Settings', icon: '⚙️', el: (
+    <Card><h1 className="text-xl font-semibold">Settings</h1>
+      <p className="mt-2 text-sm text-slate-500">Coming in Phase 3 — edit your profile, scoring rules, résumé content, templates, and AI provider here.</p>
+    </Card>
+  ),
+}
+
+const TABS = [
   { key: 'dashboard', label: 'Dashboard', icon: '📊', el: <Dashboard /> },
   { key: 'tracker', label: 'Tracker', icon: '🗂️', el: <Tracker /> },
   { key: 'search', label: 'Search & Tailor', icon: '🔍', el: <Search /> },
   { key: 'paste', label: 'Paste JD', icon: '📝', el: <PasteJD /> },
-  {
-    key: 'settings', label: 'Settings', icon: '⚙️', el: (
-      <Card><h1 className="text-xl font-semibold">Settings</h1>
-        <p className="mt-2 text-sm text-slate-500">Coming in Phase 3 — edit your profile, scoring rules, résumé content, templates, and AI provider here.</p>
-      </Card>
-    ),
-  },
 ]
+
+const PAGES = [...TABS, SETTINGS_PAGE]
 
 function useUsername() {
   const { data } = useQuery({ queryKey: ['settings'], queryFn: api.getSettings, retry: false })
@@ -69,6 +72,15 @@ export default function App() {
           <div className="ml-auto flex items-center gap-3">
             <StreakPill />
             <ThemeControls />
+            <button onClick={() => setPage('settings')} title="Settings"
+              className={`themed flex h-9 w-9 items-center justify-center rounded-xl border text-base transition ${
+                page === 'settings'
+                  ? 'border-transparent text-white'
+                  : 'border-slate-300 bg-white/70 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800/70 dark:hover:bg-slate-800'
+              }`}
+              style={page === 'settings' ? { background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' } : undefined}>
+              ⚙️
+            </button>
             <ConnectionDot />
           </div>
         </div>
@@ -76,7 +88,7 @@ export default function App() {
         {/* Top tabs */}
         <div className="mx-auto max-w-6xl px-2">
           <nav className="no-scrollbar flex gap-1 overflow-x-auto overflow-y-hidden">
-            {PAGES.map((p) => {
+            {TABS.map((p) => {
               const on = p.key === page
               return (
                 <button key={p.key} onClick={() => setPage(p.key)}
