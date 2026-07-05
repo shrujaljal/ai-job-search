@@ -3,6 +3,7 @@ import { Card } from '../components/ui'
 import { Account } from '../settings/Account'
 import { Appearance } from '../settings/Appearance'
 import { AI } from '../settings/AI'
+import { ProfileEditor } from '../settings/Profile'
 
 function Soon({ title }: { title: string }) {
   return (
@@ -17,7 +18,7 @@ const SECTIONS = [
   { key: 'account', label: '👤 Account', el: <Account /> },
   { key: 'appearance', label: '🎨 Appearance', el: <Appearance /> },
   { key: 'ai', label: '🤖 AI & Providers', el: <AI /> },
-  { key: 'profile', label: '📇 Profile', el: <Soon title="Profile" /> },
+  { key: 'profile', label: '📇 Profile', el: <ProfileEditor /> },
   { key: 'rules', label: '🎯 Scoring Rules', el: <Soon title="Scoring Rules" /> },
   { key: 'content', label: '📄 Résumé Content', el: <Soon title="Résumé Content" /> },
   { key: 'templates', label: '🧩 Templates', el: <Soon title="Templates" /> },
