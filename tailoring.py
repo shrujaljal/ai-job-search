@@ -28,7 +28,7 @@ CLI_ROOTS = {
 }
 
 # Tailored resumes are written here as: <Company>/<Role>/<Role>.docx + "Shrujal Agarwal.pdf"
-TAILORED_ROOT = Path(r"C:\Users\shruj\Downloads\2026")
+TAILORED_ROOT = Path(r"G:\My Drive\Job_Search")
 CANDIDATE_NAME = "Shrujal Agarwal"
 
 # Characters not allowed in Windows file/folder names (spaces & commas are fine).
