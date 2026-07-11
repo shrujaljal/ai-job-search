@@ -9,8 +9,9 @@ Settings UI, and optional multi-provider LLM-assisted tailoring. See
 
 ## Status
 
-**Phase 0 — scaffolding: complete.** React + FastAPI are wired together, and the
-configuration store (profile / rules / résumé content / settings) is live.
+**Phases 0-3: complete.** React + FastAPI are wired together, the core app pages
+are live, and Settings now edits profile, scoring rules, resume content,
+appearance, AI settings, and resume templates.
 
 ## Prerequisites
 
@@ -64,4 +65,22 @@ on first run):
 - `settings.json` — LLM provider/keys/toggle, theme, output folder, active template
 
 The API exposes these at `GET/PUT /api/config/{name}` and
-`POST /api/config/{name}/reset`. Later phases add editors for them in the UI.
+`POST /api/config/{name}/reset`.
+
+## Resume templates
+
+Settings -> Templates lets you use the built-in default resume design or upload a
+custom `.docx` file. Uploaded templates are stored locally in `backend/data/`
+and are never committed.
+
+Custom templates use placeholder tokens. Required tokens:
+
+- `{{summary}}`
+- `{{experience}}`
+- `{{education}}`
+- `{{skills}}`
+
+Optional tokens:
+
+- `{{name}}`, `{{contact}}`, `{{location}}`, `{{phone}}`, `{{email}}`, `{{links}}`
+- `{{coursework}}`, `{{projects}}`, `{{leadership}}`, `{{family}}`

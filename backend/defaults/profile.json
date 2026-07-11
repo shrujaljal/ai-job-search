@@ -12,13 +12,12 @@
   "education": [
     {
       "degree": "", "field": "", "institution": "", "location": "",
-      "graduation": "", "honors": [], "coursework": []
+      "graduation": "", "gpa": "", "honors": []
     }
   ],
   "experience": [
     {
-      "company": "", "role": "", "location": "",
-      "start": "", "end": "", "bullets": [""]
+      "company": "", "role": "", "date": "", "bullets": [""]
     }
   ],
   "projects": [
@@ -28,6 +27,6 @@
     { "organization": "", "role": "", "bullets": [""] }
   ],
   "skills": [
-    { "category": "", "items": [] }
+    { "name": "", "items": "" }
   ]
 }

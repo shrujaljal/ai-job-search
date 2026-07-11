@@ -12,6 +12,7 @@ Windows, falls back to Microsoft Word via pywin32 if LibreOffice isn't found.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -27,6 +28,7 @@ from resume_engine.generator import (  # low-level, generic helpers
 
 NUM_ID = "27"  # bullet numbering defined in base_template.docx
 EMAIL_REL, LINK_REL = "rId6", "rId7"
+TOKEN_RE = re.compile(r"{{\s*([a-zA-Z0-9_]+)\s*}}")
 
 
 def _set_rel_target(doc, rel_id: str, target: str) -> None:
@@ -36,8 +38,11 @@ def _set_rel_target(doc, rel_id: str, target: str) -> None:
         pass
 
 
-def render_docx(context: dict, output_path: str) -> str:
+def render_docx(context: dict, output_path: str, template_path: str | Path | None = None) -> str:
     """Build the default-template DOCX from a résumé context. Returns the path."""
+    if template_path:
+        return render_token_docx(context, output_path, template_path)
+
     ident = context.get("identity", {})
     doc = Document(str(Path(__file__).parent / "resume_engine" / "base_template.docx"))
 
@@ -156,6 +161,109 @@ def render_docx(context: dict, output_path: str) -> str:
 
 
 # ── Cross-platform PDF ────────────────────────────────────────────────────────
+def render_token_docx(context: dict, output_path: str, template_path: str | Path) -> str:
+    """Render a user-uploaded DOCX template containing {{token}} placeholders."""
+    doc = Document(str(template_path))
+    values = _token_values(context)
+
+    for paragraph in doc.paragraphs:
+        _replace_tokens_in_paragraph(paragraph, values)
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for paragraph in cell.paragraphs:
+                    _replace_tokens_in_paragraph(paragraph, values)
+
+    doc.save(output_path)
+    return output_path
+
+
+def _token_values(context: dict) -> dict[str, str]:
+    ident = context.get("identity", {})
+    links = ident.get("links", []) or []
+    link_text = "\n".join(
+        " - ".join([x for x in [link.get("label", ""), link.get("url", "")] if x])
+        for link in links
+    )
+    contact_bits = [ident.get("location", ""), ident.get("phone", ""), ident.get("email", "")]
+    if link_text:
+        contact_bits.append(link_text)
+
+    return {
+        "name": ident.get("name", ""),
+        "location": ident.get("location", ""),
+        "phone": ident.get("phone", ""),
+        "email": ident.get("email", ""),
+        "links": link_text,
+        "contact": " | ".join([bit for bit in contact_bits if bit]),
+        "summary": context.get("summary", ""),
+        "experience": _format_experience(context.get("experiences", [])),
+        "education": _format_education(context.get("education", [])),
+        "coursework": context.get("coursework", ""),
+        "projects": _format_titled_bullets(context.get("projects", []), "title"),
+        "leadership": _format_titled_bullets(context.get("leadership", []), "organization"),
+        "skills": _format_skills(context.get("skills", [])),
+        "family": context.get("family", ""),
+    }
+
+
+def _replace_tokens_in_paragraph(paragraph, values: dict[str, str]) -> None:
+    text = paragraph.text
+    if "{{" not in text:
+        return
+    replaced = TOKEN_RE.sub(lambda m: values.get(m.group(1), ""), text)
+    for run in paragraph.runs:
+        run.text = ""
+    run = paragraph.add_run()
+    lines = replaced.splitlines() or [""]
+    for i, line in enumerate(lines):
+        if i:
+            run.add_break()
+        run.add_text(line)
+
+
+def _format_experience(experiences: list[dict]) -> str:
+    blocks = []
+    for exp in experiences:
+        header = " | ".join([x for x in [exp.get("company", ""), exp.get("role", ""), exp.get("date", "")] if x])
+        bullets = "\n".join(f"- {b}" for b in exp.get("bullets", []) if b)
+        blocks.append("\n".join([x for x in [header, bullets] if x]))
+    return "\n\n".join(blocks)
+
+
+def _format_education(education: list[dict]) -> str:
+    blocks = []
+    for ed in education:
+        degree = ed.get("degree", "")
+        if ed.get("field"):
+            degree = f"{degree}, {ed['field']}" if degree else ed["field"]
+        line = " - ".join([x for x in [degree, ed.get("institution", ""), ed.get("graduation", "")] if x])
+        if ed.get("gpa"):
+            line = f"{line} (GPA: {ed['gpa']})" if line else f"GPA: {ed['gpa']}"
+        honors = ", ".join(ed.get("honors", []))
+        blocks.append("\n".join([x for x in [line, f"Honors: {honors}" if honors else ""] if x]))
+    return "\n\n".join(blocks)
+
+
+def _format_titled_bullets(items: list[dict], title_key: str) -> str:
+    blocks = []
+    for item in items:
+        title = item.get(title_key, "")
+        if title_key == "organization" and item.get("role"):
+            title = " | ".join([x for x in [title, item.get("role", "")] if x])
+        bullets = "\n".join(f"- {b}" for b in item.get("bullets", []) if b)
+        blocks.append("\n".join([x for x in [title, bullets] if x]))
+    return "\n\n".join(blocks)
+
+
+def _format_skills(skills: list[dict]) -> str:
+    return "\n".join(
+        f"{cat.get('name', '')}: {cat.get('items', '')}".strip(": ")
+        for cat in skills
+        if cat.get("name") or cat.get("items")
+    )
+
+
 def _find_soffice() -> str | None:
     for name in ("soffice", "libreoffice"):
         found = shutil.which(name)

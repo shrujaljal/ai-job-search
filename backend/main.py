@@ -16,7 +16,10 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+import shutil
+import tempfile
+
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -30,6 +33,7 @@ import scrapers
 import store
 import resume_builder
 import resume_render
+import templates as template_store
 
 app = FastAPI(title="Job Application Agent API", version="2.0.0-dev")
 
@@ -78,6 +82,75 @@ def reset_config(name: str) -> dict:
     if name not in config.CONFIG_NAMES:
         raise HTTPException(404, f"Unknown config '{name}'")
     return config.reset(name)
+
+
+# ── Resume templates ────────────────────────────────────────────────────────
+class ActiveTemplateRequest(BaseModel):
+    id: str
+
+
+@app.get("/api/templates")
+def list_templates() -> dict:
+    settings = config.load("settings")
+    active = settings.get("active_template", template_store.DEFAULT_TEMPLATE_ID)
+    return {
+        "active_template": active,
+        "required_tokens": sorted(template_store.REQUIRED_TOKENS),
+        "known_tokens": sorted(template_store.KNOWN_TOKENS),
+        "templates": template_store.list_templates(active),
+    }
+
+
+@app.post("/api/templates")
+def upload_template(file: UploadFile = File(...)) -> dict:
+    if not file.filename or not file.filename.lower().endswith(".docx"):
+        raise HTTPException(400, "Upload a .docx template.")
+
+    with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+        shutil.copyfileobj(file.file, tmp)
+    try:
+        try:
+            item = template_store.save_upload(file.filename, tmp_path)
+        except Exception as e:
+            raise HTTPException(400, f"Template could not be read: {e}") from e
+        return item
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+
+@app.put("/api/templates/active")
+def set_active_template(req: ActiveTemplateRequest) -> dict:
+    template_id = req.id or template_store.DEFAULT_TEMPLATE_ID
+    if template_id != template_store.DEFAULT_TEMPLATE_ID:
+        path = template_store.resolve_template(template_id)
+        if not path or not path.exists():
+            raise HTTPException(404, "Template not found.")
+        info = template_store.validate_template(path)
+        if not info["valid"]:
+            missing = ", ".join(info["missing_tokens"])
+            raise HTTPException(400, f"Template is missing required tokens: {missing}")
+
+    settings = config.load("settings")
+    settings["active_template"] = template_id
+    config.save("settings", settings)
+    return {"active_template": template_id}
+
+
+@app.delete("/api/templates/{template_id}")
+def delete_template(template_id: str) -> dict:
+    try:
+        template_store.delete_template(template_id)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    except FileNotFoundError as e:
+        raise HTTPException(404, "Template not found.") from e
+
+    settings = config.load("settings")
+    if settings.get("active_template") == template_id:
+        settings["active_template"] = template_store.DEFAULT_TEMPLATE_ID
+        config.save("settings", settings)
+    return {"deleted": True}
 
 
 # ── Search (LinkedIn) → JD parse → config-driven scoring ─────────────────────
@@ -190,7 +263,8 @@ def tailor(req: TailorRequest) -> dict:
     docx_path = out_dir / f"{role_name}.docx"
     pdf_path = out_dir / f"{_safe(candidate)}.pdf"
 
-    resume_render.render_docx(ctx, str(docx_path))
+    template_path = template_store.resolve_template(settings.get("active_template"))
+    resume_render.render_docx(ctx, str(docx_path), template_path=template_path)
     pdf_error = ""
     try:
         resume_render.docx_to_pdf(docx_path, pdf_path)

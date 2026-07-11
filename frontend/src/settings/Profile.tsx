@@ -19,6 +19,54 @@ interface Profile {
   experience: Exp[]; education: Edu[]; projects: Proj[]; leadership: Lead[]; skills: Skill[]
 }
 
+function asText(v: unknown) {
+  return Array.isArray(v) ? v.join(', ') : String(v ?? '')
+}
+
+function normalizeProfile(raw: any): Profile {
+  return {
+    identity: {
+      name: raw?.identity?.name ?? '',
+      email: raw?.identity?.email ?? '',
+      phone: raw?.identity?.phone ?? '',
+      location: raw?.identity?.location ?? '',
+      links: raw?.identity?.links ?? [],
+      work_authorization: raw?.identity?.work_authorization ?? '',
+      needs_sponsorship: Boolean(raw?.identity?.needs_sponsorship),
+    },
+    summary: raw?.summary ?? '',
+    experience: (raw?.experience ?? []).map((e: any) => ({
+      company: e.company ?? '',
+      role: e.role ?? '',
+      date: e.date ?? [e.start, e.end].filter(Boolean).join(' - '),
+      bullets: e.bullets ?? [],
+    })),
+    education: (raw?.education ?? []).map((e: any) => ({
+      degree: e.degree ?? '',
+      field: e.field ?? '',
+      institution: e.institution ?? '',
+      location: e.location ?? '',
+      graduation: e.graduation ?? '',
+      gpa: e.gpa ?? '',
+      honors: e.honors ?? [],
+    })),
+    projects: (raw?.projects ?? []).map((p: any) => ({
+      title: p.title ?? '',
+      bullets: p.bullets ?? [],
+      families: p.families ?? [],
+    })),
+    leadership: (raw?.leadership ?? []).map((l: any) => ({
+      organization: l.organization ?? '',
+      role: l.role ?? '',
+      bullets: l.bullets ?? [],
+    })),
+    skills: (raw?.skills ?? []).map((s: any) => ({
+      name: s.name ?? s.category ?? s.label ?? '',
+      items: asText(s.items),
+    })),
+  }
+}
+
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <details open className="rounded-2xl border border-slate-200 dark:border-slate-800">
@@ -31,17 +79,18 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 export function ProfileEditor() {
   const { data, save, reset } = useConfig<Profile>('profile')
   const [d, setD] = useState<Profile | null>(null)
+  const clean = data ? normalizeProfile(data) : null
   // Initialize the draft once; background refetches won't clobber in-progress edits.
-  useEffect(() => { if (data && !d) setD(structuredClone(data)) }, [data, d])
+  useEffect(() => { if (clean && !d) setD(structuredClone(clean)) }, [clean, d])
   if (!d) return <p className="text-sm text-slate-500">Loading…</p>
 
   const doReset = async () => {
     if (!confirm('Reset the profile to the shipped default? Your edits will be lost.')) return
     const fresh = await reset.mutateAsync()
-    setD(structuredClone(fresh))
+    setD(normalizeProfile(fresh))
   }
 
-  const dirty = JSON.stringify(d) !== JSON.stringify(data)
+  const dirty = JSON.stringify(d) !== JSON.stringify(clean)
   const id = d.identity
   const setId = (patch: Partial<Identity>) => setD({ ...d, identity: { ...id, ...patch } })
 

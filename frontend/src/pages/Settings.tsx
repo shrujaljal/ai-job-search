@@ -3,25 +3,19 @@ import { Card } from '../components/ui'
 import { Account } from '../settings/Account'
 import { Appearance } from '../settings/Appearance'
 import { AI } from '../settings/AI'
+import { ContentEditor } from '../settings/Content'
 import { ProfileEditor } from '../settings/Profile'
-
-function Soon({ title }: { title: string }) {
-  return (
-    <div>
-      <h1 className="text-xl font-semibold">{title}</h1>
-      <p className="mt-2 text-sm text-slate-500">Editor coming next in Phase 3.</p>
-    </div>
-  )
-}
+import { RulesEditor } from '../settings/Rules'
+import { Templates } from '../settings/Templates'
 
 const SECTIONS = [
   { key: 'account', label: '👤 Account', el: <Account /> },
   { key: 'appearance', label: '🎨 Appearance', el: <Appearance /> },
   { key: 'ai', label: '🤖 AI & Providers', el: <AI /> },
   { key: 'profile', label: '📇 Profile', el: <ProfileEditor /> },
-  { key: 'rules', label: '🎯 Scoring Rules', el: <Soon title="Scoring Rules" /> },
-  { key: 'content', label: '📄 Résumé Content', el: <Soon title="Résumé Content" /> },
-  { key: 'templates', label: '🧩 Templates', el: <Soon title="Templates" /> },
+  { key: 'rules', label: '🎯 Scoring Rules', el: <RulesEditor /> },
+  { key: 'content', label: '📄 Résumé Content', el: <ContentEditor /> },
+  { key: 'templates', label: '🧩 Templates', el: <Templates /> },
 ]
 
 export default function Settings() {

@@ -119,7 +119,7 @@ def build_context(profile: dict, content: dict, family: str) -> dict:
         if isinstance(items, list):
             items = ", ".join(items)
         skills.append({
-            "name": cat.get("name") or cat.get("category", ""),
+            "name": cat.get("name") or cat.get("category", "") or cat.get("label", ""),
             "items": _truncate(items, limits["max_chars_per_skill_line"]),
         })
 

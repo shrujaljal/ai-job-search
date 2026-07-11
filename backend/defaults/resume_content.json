@@ -5,7 +5,7 @@
       "summary": "",
       "coursework": "",
       "skill_categories": [
-        { "label": "Core", "items": "" }
+        { "name": "Core", "items": "" }
       ],
       "projects": []
     }
