@@ -1,11 +1,10 @@
 """
-Resume generator that produces Word documents matching Shrujal's exact resume format.
+Resume generator that produces Word documents matching Shrujal's resume template.
 
 Layout: single borderless table, A4 page, 0.5" margins, 10pt Calibri.
 Two-column grid: 7678 twips (left) + 2788 twips (right).
-Section headers: bold blue (#2F5496) with bottom border, span both columns.
-Job rows: company|role left, date right.
-Bullets: span both columns, 10pt, standard bullet list.
+Section order: summary, education, skills, experience, projects/leadership,
+honors/awards. Section headers are bold blue (#2F5496) with a bottom rule.
 """
 
 from pathlib import Path
@@ -14,6 +13,7 @@ from copy import deepcopy
 from docx import Document
 from docx.shared import Pt, RGBColor, Twips
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.opc.constants import RELATIONSHIP_TYPE
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from lxml import etree
@@ -32,7 +32,9 @@ FONT = "Calibri"
 SZ = 20        # half-points → 10pt
 SZ_NAME = 32   # half-points → 16pt
 
-TEMPLATE = Path(__file__).parent / "base_template.docx"
+TEMPLATE = Path(__file__).parent / "new_template.docx"
+if not TEMPLATE.exists():
+    TEMPLATE = Path(__file__).parent / "base_template.docx"
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -92,12 +94,26 @@ def _hyperlink_run(rel_id: str, display: str) -> OxmlElement:
     fonts.set(qn("w:cstheme"), "minorHAnsi")
     rPr.append(style)
     rPr.append(fonts)
+    s = OxmlElement("w:sz")
+    s.set(qn("w:val"), str(SZ))
+    rPr.append(s)
+    sCs = OxmlElement("w:szCs")
+    sCs.set(qn("w:val"), str(SZ))
+    rPr.append(sCs)
     r.append(rPr)
     t = OxmlElement("w:t")
     t.text = display
     r.append(t)
     hl.append(r)
     return hl
+
+
+def _line_break() -> OxmlElement:
+    return OxmlElement("w:br")
+
+
+def _external_rel_id(doc: Document, url: str) -> str:
+    return doc.part.relate_to(url, RELATIONSHIP_TYPE.HYPERLINK, is_external=True)
 
 
 def _para(align=None, space_before=None, space_after=None, justify=False) -> OxmlElement:
@@ -208,13 +224,19 @@ def _build_header_row(table, data: ResumeData, num_id: str) -> None:
     _span_cell(tr, [p])
 
 
-def _build_contact_row(table, data: ResumeData, email_rel_id: str, li_rel_id: str) -> None:
+def _build_contact_row(table, data: ResumeData, rel_ids: dict[str, str]) -> None:
     tr = _new_row(table)
     p = _para(align="center", space_before=60, space_after=60)
-    p.append(_run(f"{data.location} | {data.phone} | ", sz=SZ))
-    p.append(_hyperlink_run(email_rel_id, data.email))
+    p.append(_run(f"{data.phone} | ", sz=SZ))
+    p.append(_hyperlink_run(rel_ids["email"], data.email))
     p.append(_run(" | ", sz=SZ))
-    p.append(_hyperlink_run(li_rel_id, data.linkedin_text))
+    p.append(_hyperlink_run(rel_ids["linkedin"], data.linkedin_text))
+    if data.portfolio_url:
+        p.append(_run(" | ", sz=SZ))
+        p.append(_hyperlink_run(rel_ids["portfolio"], data.portfolio_text))
+    if data.github_url:
+        p.append(_run(" | ", sz=SZ))
+        p.append(_hyperlink_run(rel_ids["github"], data.github_text))
     _span_cell(tr, [p])
 
 
@@ -325,6 +347,82 @@ def _build_skills_row(table, data: ResumeData, num_id: str) -> None:
     _span_cell(tr, paras)
 
 
+# Replacement builders for the current DOCX template. They intentionally appear
+# after the legacy builders above so these definitions are the ones generate()
+# uses at runtime.
+def _build_education_row(table, data: ResumeData) -> None:
+    tr = _new_row(table)
+    left = []
+    right = []
+
+    p1 = _para()
+    p1.append(_run(
+        "Master of Business Administration (STEM MBA) - University of California, Riverside",
+        bold=True, sz=SZ,
+    ))
+    p1.append(_run(" GPA: 3.8", italic=True, sz=SZ))
+    left.append(p1)
+
+    p2 = _para()
+    p2.append(_run(
+        "Bachelor of Technology, Biotechnology - Vellore Institute of Technology, India",
+        bold=True, sz=SZ,
+    ))
+    p2.append(_run(" GPA: 3.5", italic=True, sz=SZ))
+    left.append(p2)
+
+    d1 = _para(align="right")
+    d1.append(_run("June 2026", bold=True, sz=SZ))
+    right.append(d1)
+
+    d2 = _para(align="right")
+    d2.append(_run("Aug 2023", bold=True, sz=SZ))
+    right.append(d2)
+
+    _two_cells(tr, left, right)
+
+
+def _build_projects_row(table, data: ResumeData, num_id: str) -> None:
+    tr = _new_row(table)
+    paras = []
+
+    for proj in data.projects:
+        tp = _para()
+        tp.append(_run(proj.title, bold=True, sz=SZ))
+        paras.append(tp)
+        for b in proj.bullets:
+            paras.append(_bullet_para(num_id, b))
+
+    if data.leadership_bullets:
+        lp = _para()
+        lp.append(_run(
+            "UCR GSM Student Association | Professional Development Lead",
+            bold=True, sz=SZ,
+        ))
+        paras.append(lp)
+        for b in data.leadership_bullets:
+            paras.append(_bullet_para(num_id, b))
+
+    _span_cell(tr, paras)
+
+
+def _build_skills_row(table, data: ResumeData, num_id: str = "27") -> None:
+    tr = _new_row(table)
+    paras = []
+    for cat in data.skills:
+        p = _para(justify=True)
+        p.append(_run(f"{cat.name}:", bold=True, sz=SZ))
+        p.append(_run(f" {cat.skills}", sz=SZ))
+        paras.append(p)
+    _span_cell(tr, paras)
+
+
+def _build_honors_row(table, data: ResumeData, num_id: str) -> None:
+    tr = _new_row(table)
+    paras = [_bullet_para(num_id, award) for award in data.honors_awards]
+    _span_cell(tr, paras)
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # Public API
 # ════════════════════════════════════════════════════════════════════════════
@@ -342,8 +440,14 @@ def generate(data: ResumeData, output_path: str) -> tuple[str, list[str]]:
 
     # ── Grab existing relationship IDs for email + LinkedIn hyperlinks ───────
     # The template already has rId6 = email, rId7 = LinkedIn
-    email_rel_id = "rId6"
-    li_rel_id = "rId7"
+    rel_ids = {
+        "email": _external_rel_id(doc, f"mailto:{data.email}"),
+        "linkedin": _external_rel_id(doc, data.linkedin_url),
+    }
+    if data.portfolio_url:
+        rel_ids["portfolio"] = _external_rel_id(doc, data.portfolio_url)
+    if data.github_url:
+        rel_ids["github"] = _external_rel_id(doc, data.github_url)
 
     # ── Find the bullet numId used in the template ───────────────────────────
     # We reuse the existing numbering definition (numId=27 in the template)
@@ -357,19 +461,21 @@ def generate(data: ResumeData, output_path: str) -> tuple[str, list[str]]:
 
     # ── Rebuild rows in order ────────────────────────────────────────────────
     _build_header_row(table, data, num_id)
-    _build_contact_row(table, data, email_rel_id, li_rel_id)
+    _build_contact_row(table, data, rel_ids)
     _build_section_header(table, "PROFESSIONAL SUMMARY")
     _build_summary_row(table, data)
+    _build_section_header(table, "EDUCATION", space_before=120)
+    _build_education_row(table, data)
+    _build_section_header(table, "SKILLS", space_before=120)
+    _build_skills_row(table, data, num_id)
     _build_section_header(table, "EXPERIENCE", space_before=120)
     for exp in data.experiences:
         _build_experience_header(table, exp.company, exp.role, exp.date)
         _build_bullets_row(table, exp.bullets, num_id)
-    _build_section_header(table, "EDUCATION", space_before=120)
-    _build_education_row(table, data)
     _build_section_header(table, "PROJECTS & LEADERSHIP", space_before=120)
     _build_projects_row(table, data, num_id)
-    _build_section_header(table, "SKILLS", space_before=120)
-    _build_skills_row(table, data, num_id)
+    _build_section_header(table, "HONORS & AWARDS", space_before=120)
+    _build_honors_row(table, data, num_id)
 
     doc.save(output_path)
     return output_path, warnings

@@ -27,12 +27,17 @@ Opens at http://localhost:8501 with four tabs:
 
 ## Resume engine
 
-`resume_engine/` generates Word resumes that match the exact table-based format
-(blue section headers, two-column job rows, 10pt Calibri, 1 page).
+`resume_engine/` generates Word resumes that match the table-based DOCX format
+in `new_template.docx` (blue section headers, two-column job rows, 10pt
+Calibri, 1 page).
 
 - `models.py` — data classes (`ResumeData`, `ExperienceEntry`, etc.)
 - `content_rules.py` — 1-page limits (bullet counts, char caps) enforced before generation
-- `generator.py` — builds the `.docx` from `base_template.docx`
+- `generator.py` — builds the `.docx` from `new_template.docx`
+
+Replacing the DOCX alone is not enough for a layout change: `generator.py`
+clears and rebuilds the template table programmatically, so section order,
+spacing, and row structure live in code.
 
 To tweak how much fits on the page, edit the limits at the top of
 `content_rules.py`.

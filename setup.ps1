@@ -12,10 +12,31 @@ Write-Host "`n[1/3] Setting up virtual environment (.venv) and Python packages..
 
 $venvPy = Join-Path $root ".venv\Scripts\python.exe"
 
-# Find a base Python to create the venv (prefer the 'py' launcher, else 'python').
+# Find a base Python to create the venv. Windows often exposes a fake
+# C:\Windows\System32\python app alias, so verify candidates before using them.
 $basePy = $null
-if (Get-Command py -ErrorAction SilentlyContinue) { $basePy = "py" }
-elseif (Get-Command python -ErrorAction SilentlyContinue) { $basePy = "python" }
+$candidates = @()
+
+$pyLauncher = Get-Command py -ErrorAction SilentlyContinue
+if ($pyLauncher) {
+    $candidates += @{ Cmd = "py"; Args = @("-3") }
+}
+
+foreach ($p in (where.exe python 2>$null)) {
+    if ($p -and ($p -notmatch "\\Windows\\System32\\python(\.exe)?$")) {
+        $candidates += @{ Cmd = $p; Args = @() }
+    }
+}
+
+foreach ($candidate in $candidates) {
+    try {
+        $versionOutput = & $candidate.Cmd @($candidate.Args + @("--version")) 2>&1
+        if ($LASTEXITCODE -eq 0 -and ($versionOutput -match "Python\s+3\.")) {
+            $basePy = $candidate
+            break
+        }
+    } catch { }
+}
 
 if (-not (Test-Path $venvPy)) {
     if (-not $basePy) {
@@ -23,7 +44,7 @@ if (-not (Test-Path $venvPy)) {
         exit 1
     }
     Write-Host "  Creating .venv ..." -ForegroundColor DarkGray
-    & $basePy -m venv (Join-Path $root ".venv")
+    & $basePy.Cmd @($basePy.Args + @("-m", "venv", (Join-Path $root ".venv")))
 }
 
 if (Test-Path $venvPy) {
