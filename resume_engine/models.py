@@ -28,7 +28,7 @@ class ResumeData:
     name: str = "SHRUJAL AGARWAL"
     location: str = "California, USA"
     phone: str = "+1 (951)-347-5278"
-    email: str = "sagar035@ucr.edu"
+    email: str = "shrujalag.gms@gmail.com"
     linkedin_url: str = "https://www.linkedin.com/in/shrujalagarwal/"
     linkedin_text: str = "LinkedIn"
     portfolio_url: str = "https://shrujal-portfolio-gzvd.vercel.app/"

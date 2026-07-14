@@ -22,8 +22,8 @@ from .models import ResumeData
 from .content_rules import enforce
 
 # ── Layout constants (twips; 1440 twips = 1 inch) ───────────────────────────
-COL1_W = 7678
-COL2_W = 2788
+COL1_W = 8647
+COL2_W = 1819
 TOTAL_W = COL1_W + COL2_W
 
 # ── Style constants ──────────────────────────────────────────────────────────
