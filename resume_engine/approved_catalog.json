@@ -124,7 +124,7 @@
     {
       "company": "Goldman Sachs",
       "date": "Feb 2023 – Jun 2023",
-      "bullet_limit": 4,
+      "bullet_limit": 3,
       "titles": [
         {"text": "STEM Analyst – Asset & Wealth Management", "tags": ["analytics", "finance", "operations"], "priority": 5, "default": true},
         {"text": "Business Analyst – Asset & Wealth Management", "tags": ["business_analysis", "analytics", "finance"], "priority": 5},

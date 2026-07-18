@@ -489,17 +489,17 @@ def generate(data: ResumeData, output_path: str) -> tuple[str, list[str]]:
     # ── Rebuild rows in order ────────────────────────────────────────────────
     _build_header_row(table, data, num_id)
     _build_contact_row(table, data, rel_ids)
-    _build_section_header(table, "PROFESSIONAL SUMMARY", space_before=240)
+    _build_section_header(table, "PROFESSIONAL SUMMARY", space_before=180)
     _build_summary_row(table, data)
-    _build_section_header(table, "SKILLS", space_before=120)
+    _build_section_header(table, "SKILLS", space_before=60)
     _build_skills_row(table, data, num_id)
-    _build_section_header(table, "EXPERIENCE", space_before=120)
+    _build_section_header(table, "EXPERIENCE", space_before=60)
     for exp in data.experiences:
         _build_experience_header(table, exp.company, exp.role, exp.date)
         _build_bullets_row(table, exp.bullets, num_id)
-    _build_section_header(table, "EDUCATION", space_before=120)
+    _build_section_header(table, "EDUCATION", space_before=60)
     _build_education_row(table, data)
-    _build_section_header(table, "HONORS & AWARDS", space_before=120)
+    _build_section_header(table, "HONORS & AWARDS", space_before=60)
     _build_honors_row(table, data, num_id)
 
     doc.save(output_path)

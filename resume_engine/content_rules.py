@@ -9,7 +9,7 @@ from .models import ResumeData
 # Hard limits (calibrated against the base_template.docx which fits exactly 1 page)
 MAX_SUMMARY_CHARS = 530        # ~3–4 sentences; original is ~500 chars
 MAX_EXPERIENCES = 5
-MAX_BULLETS_PER_EXP = {0: 4, 1: 3, 2: 4, 3: 4, 4: 1}
+MAX_BULLETS_PER_EXP = {0: 4, 1: 3, 2: 4, 3: 3, 4: 1}
 MAX_CHARS_PER_BULLET = 250     # longest approved template bullet is 242 chars
 MAX_PROJECT_ENTRIES = 1
 MAX_PROJECT_BULLETS = 2

@@ -46,7 +46,7 @@ class CatalogTailoringTests(unittest.TestCase):
                 )
                 for exp in data.experiences:
                     self.assertIsNone(UNSUPPORTED_SENIORITY.search(exp.role), exp.role)
-                self.assertEqual([4, 3, 4, 4, 1], [len(exp.bullets) for exp in data.experiences])
+                self.assertEqual([4, 3, 4, 3, 1], [len(exp.bullets) for exp in data.experiences])
 
                 skill_text = " | ".join(category.skills for category in data.skills)
                 for expected in fixture["expected_skills"]:
