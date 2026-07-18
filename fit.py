@@ -35,7 +35,8 @@ ROLE_FAMILIES = {
     ]),
     "Revenue / Sales Operations": (1, [
         "revenue operations", "revops", "sales operations", "sales strategy",
-        "gtm operations", "go-to-market operations",
+        "sales strategy and operations", "sales strategy & operations",
+        "gtm operations", "gtm strategy", "go-to-market operations",
     ]),
     "Product Operations": (1, [
         "product operations", "product ops",
@@ -46,6 +47,10 @@ ROLE_FAMILIES = {
     "Marketing Operations": (2, [
         "marketing operations", "marketing ops", "campaign operations",
         "growth strategy", "marketing analyst", "marketing strategy",
+    ]),
+    "Category / Market Insights": (2, [
+        "category insights", "category manager", "category management",
+        "market insights", "consumer insights", "shopper insights",
     ]),
     "Consulting": (2, [
         "consultant", "consulting", "advisory", "business transformation",

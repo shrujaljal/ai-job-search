@@ -18,7 +18,7 @@ from pathlib import Path
 
 from fit import (detect_family, extract_min_years, MAX_YEARS,
                  analyze_sponsorship)
-from resume_engine import tailor_for_family, generate
+from resume_engine import tailor_for_job, generate
 
 ROOT = Path(__file__).parent
 CLI_ROOTS = {
@@ -184,7 +184,7 @@ def tailor_job(job: dict, enforce_sponsorship: bool = True) -> dict:
             exp_warning = (f"This role asks for {min_years}+ years of experience "
                            f"(above the ~{MAX_YEARS}-year early-career target).")
 
-        data = tailor_for_family(family)
+        data, tailoring_report = tailor_for_job(family, title, jd_text)
 
         out_dir = build_output_dir(company, title)
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -225,6 +225,7 @@ def tailor_job(job: dict, enforce_sponsorship: bool = True) -> dict:
             "jd_path": str(jd_path), "out_dir": str(out_dir),
             "warnings": warnings, "exp_warning": exp_warning,
             "sponsorship_warning": sponsorship_warning,
+            "tailoring_report": tailoring_report,
             "pdf_error": pdf_error, "url": job.get("url", ""),
             "location": job.get("location", ""),
             "blocked": False, "ok": True, "error": "",

@@ -53,7 +53,7 @@ class ResumeData:
     # Honors & awards
     honors_awards: List[str] = field(default_factory=lambda: [
         "Beta Gamma Sigma Honor Society (Top 20% of MBA Class)",
-        "2024 UCR Case Competition Winner",
         "Award for Best Graduate Teaching Assistant, Statistics",
+        "2024 UCR Case Competition Winner",
         "Make A Difference Volunteer Educator, 150+ teaching hours",
     ])

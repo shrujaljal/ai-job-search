@@ -1,0 +1,34 @@
+[
+  {
+    "name": "visa_gtm_ai",
+    "title": "Analyst, GTM Strategy, Operations & AI Enablement",
+    "jd_text": "Analyze sales, pipeline, revenue, and performance data using Excel, SQL, Tableau, or Power BI. Build repeatable analyses, KPI dashboards, AI-powered agents, automations, and post-sales intake workflows. Partner with Sales Operations, GTM, Product, and Enablement teams and translate findings into executive-ready stories.",
+    "expected_family": "Revenue / Sales Operations",
+    "expected_skills": ["SQL", "Advanced Excel", "Workflow Automation", "Sales Operations"],
+    "expected_gaps": ["AI agent development"]
+  },
+  {
+    "name": "linkedin_sales_strategy",
+    "title": "Sales Strategy and Operations Associate",
+    "jd_text": "Drive strategic planning, forecasting, customer segmentation, headcount and territory planning, quota setting, sales performance analysis, dashboards, and recommendations for senior sales executives. Requires Excel, PowerPoint, SQL, AI tools, stakeholder partnership, and cross-functional execution.",
+    "expected_family": "Revenue / Sales Operations",
+    "expected_skills": ["SQL", "Advanced Excel", "PowerPoint", "Forecasting"],
+    "expected_gaps": ["quota management", "territory planning"]
+  },
+  {
+    "name": "ninjatrader_business_operations",
+    "title": "Business Operations & Strategy Associate",
+    "jd_text": "Operate as an internal consultant, build business cases, conduct quantitative analysis, define KPIs, manage project timelines and cross-functional workstreams, prepare QBRs, automate workflows, and support AI adoption. Requires Advanced Excel, Google Sheets, financial modeling, SQL, Looker, Tableau, PowerPoint, and project management.",
+    "expected_family": "Strategy & Operations",
+    "expected_skills": ["Advanced Excel", "Business Case Development", "Project Management", "SQL"],
+    "expected_gaps": ["financial modeling", "Looker", "Google Sheets"]
+  },
+  {
+    "name": "acosta_category_insights",
+    "title": "Category Insights Manager (CPG)",
+    "jd_text": "Create category-centric selling stories, analyze data, develop recommendations, maintain client reporting, build sales presentations, and manage project plans. Requires Excel, PowerPoint, Power BI, Circana IRI, Nielsen, 84.51, Market 6, Stratum, syndicated data, CPG math, VB, and advanced macros.",
+    "expected_family": "Category / Market Insights",
+    "expected_skills": ["Advanced Excel", "Power BI", "PowerPoint", "Sales Presentations"],
+    "expected_gaps": ["Circana / IRI", "Nielsen", "VB and advanced macros", "syndicated CPG data"]
+  }
+]

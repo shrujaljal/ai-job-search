@@ -131,6 +131,26 @@ def render_result(r: dict, key_prefix: str) -> None:
             st.warning("⚠️ " + r["exp_warning"])
         if r.get("warnings"):
             st.caption("Content trimmed to fit 1 page: " + "; ".join(r["warnings"]))
+        report = r.get("tailoring_report") or {}
+        if report:
+            with st.expander("Tailoring details", expanded=False):
+                themes = report.get("matched_themes", [])
+                if themes:
+                    st.write("**Matched themes:** " + ", ".join(themes))
+                titles = report.get("selected_titles", {})
+                if titles:
+                    st.write("**Selected experience titles:**")
+                    for employer, selected_title in titles.items():
+                        st.write(f"- {employer}: {selected_title}")
+                skills = report.get("matched_skills", [])
+                if skills:
+                    st.write("**Approved JD-matched skills:** " + ", ".join(skills))
+                gaps = report.get("unapproved_jd_terms", [])
+                if gaps:
+                    st.warning(
+                        "JD terms not added because they are not in the approved "
+                        "candidate catalog: " + ", ".join(gaps)
+                    )
         if r.get("pdf_error"):
             st.warning("PDF not created — " + r["pdf_error"] + " (the DOCX is still saved).")
 

@@ -2,28 +2,23 @@
 Resume generator that produces Word documents matching Shrujal's resume template.
 
 Layout: single borderless table, A4 page, 0.5" margins, 10pt Calibri.
-Two-column grid: 7678 twips (left) + 2788 twips (right).
-Section order: summary, education, skills, experience, projects/leadership,
-honors/awards. Section headers are bold blue (#2F5496) with a bottom rule.
+Two-column grid: 7986 twips (left) + 2480 twips (right).
+Section order: summary, skills, experience, education, honors/awards.
+Section headers are bold blue (#2F5496) with a bottom rule.
 """
 
 from pathlib import Path
-from copy import deepcopy
-
 from docx import Document
-from docx.shared import Pt, RGBColor, Twips
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.opc.constants import RELATIONSHIP_TYPE
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
-from lxml import etree
 
 from .models import ResumeData
 from .content_rules import enforce
 
 # ── Layout constants (twips; 1440 twips = 1 inch) ───────────────────────────
-COL1_W = 8647
-COL2_W = 1819
+COL1_W = 7986
+COL2_W = 2480
 TOTAL_W = COL1_W + COL2_W
 
 # ── Style constants ──────────────────────────────────────────────────────────
@@ -176,8 +171,8 @@ def _span_cell(tr, content_paras: list, bottom_border=False) -> None:
     tc = OxmlElement("w:tc")
     tcPr = OxmlElement("w:tcPr")
     tcW = OxmlElement("w:tcW")
-    tcW.set(qn("w:w"), "0")
-    tcW.set(qn("w:type"), "auto")
+    tcW.set(qn("w:w"), str(TOTAL_W))
+    tcW.set(qn("w:type"), "dxa")
     tcPr.append(tcW)
     gridSpan = OxmlElement("w:gridSpan")
     gridSpan.set(qn("w:val"), "2")
@@ -213,6 +208,33 @@ def _two_cells(tr, left_paras: list, right_paras: list,
         tr.append(tc)
 
 
+def _set_table_geometry(table) -> None:
+    """Keep the table width, grid, and generated cell widths in agreement."""
+    tbl = table._tbl
+    tblPr = tbl.tblPr
+
+    tblW = tblPr.find(qn("w:tblW"))
+    if tblW is None:
+        tblW = OxmlElement("w:tblW")
+        tblPr.insert(0, tblW)
+    tblW.set(qn("w:w"), str(TOTAL_W))
+    tblW.set(qn("w:type"), "dxa")
+
+    layout = tblPr.find(qn("w:tblLayout"))
+    if layout is None:
+        layout = OxmlElement("w:tblLayout")
+        tblPr.append(layout)
+    layout.set(qn("w:type"), "fixed")
+
+    grid = tbl.tblGrid
+    for col in list(grid):
+        grid.remove(col)
+    for width in (COL1_W, COL2_W):
+        col = OxmlElement("w:gridCol")
+        col.set(qn("w:w"), str(width))
+        grid.append(col)
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # Section builders
 # ════════════════════════════════════════════════════════════════════════════
@@ -226,7 +248,7 @@ def _build_header_row(table, data: ResumeData, num_id: str) -> None:
 
 def _build_contact_row(table, data: ResumeData, rel_ids: dict[str, str]) -> None:
     tr = _new_row(table)
-    p = _para(align="center", space_before=60, space_after=60)
+    p = _para(align="center", space_before=60)
     p.append(_run(f"{data.phone} | ", sz=SZ))
     p.append(_hyperlink_run(rel_ids["email"], data.email))
     p.append(_run(" | ", sz=SZ))
@@ -240,7 +262,7 @@ def _build_contact_row(table, data: ResumeData, rel_ids: dict[str, str]) -> None
     _span_cell(tr, [p])
 
 
-def _build_section_header(table, label: str, space_before=60) -> None:
+def _build_section_header(table, label: str, space_before=120) -> None:
     tr = _new_row(table)
     p = _para(space_before=space_before)
     p.find(qn("w:pPr")).append(_rpr(bold=True, color=BLUE, sz=SZ))
@@ -258,11 +280,11 @@ def _build_summary_row(table, data: ResumeData) -> None:
 def _build_experience_header(table, company: str, role: str, date: str) -> None:
     tr = _new_row(table)
     # Left: "Company | Role"
-    lp = _para(space_before=120)
+    lp = _para(justify=True)
     lp.append(_run(f"{company} | ", bold=True, sz=SZ))
     lp.append(_run(role, bold=True, sz=SZ))
     # Right: date, right-aligned
-    rp = _para(align="right", space_before=120)
+    rp = _para(align="right")
     rp.append(_run(date, bold=True, sz=SZ))
     _two_cells(tr, [lp], [rp])
 
@@ -419,7 +441,11 @@ def _build_skills_row(table, data: ResumeData, num_id: str = "27") -> None:
 
 def _build_honors_row(table, data: ResumeData, num_id: str) -> None:
     tr = _new_row(table)
-    paras = [_bullet_para(num_id, award) for award in data.honors_awards]
+    paras = []
+    for index in range(0, len(data.honors_awards), 2):
+        p = _para(justify=True)
+        p.append(_run(" | ".join(data.honors_awards[index:index + 2]), sz=SZ))
+        paras.append(p)
     _span_cell(tr, paras)
 
 
@@ -455,6 +481,7 @@ def generate(data: ResumeData, output_path: str) -> tuple[str, list[str]]:
 
     # ── Clear all existing rows from the table ───────────────────────────────
     table = doc.tables[0]
+    _set_table_geometry(table)
     tbl = table._tbl
     for tr in list(tbl.findall(qn("w:tr"))):
         tbl.remove(tr)
@@ -462,18 +489,16 @@ def generate(data: ResumeData, output_path: str) -> tuple[str, list[str]]:
     # ── Rebuild rows in order ────────────────────────────────────────────────
     _build_header_row(table, data, num_id)
     _build_contact_row(table, data, rel_ids)
-    _build_section_header(table, "PROFESSIONAL SUMMARY")
+    _build_section_header(table, "PROFESSIONAL SUMMARY", space_before=240)
     _build_summary_row(table, data)
-    _build_section_header(table, "EDUCATION", space_before=120)
-    _build_education_row(table, data)
     _build_section_header(table, "SKILLS", space_before=120)
     _build_skills_row(table, data, num_id)
     _build_section_header(table, "EXPERIENCE", space_before=120)
     for exp in data.experiences:
         _build_experience_header(table, exp.company, exp.role, exp.date)
         _build_bullets_row(table, exp.bullets, num_id)
-    _build_section_header(table, "PROJECTS & LEADERSHIP", space_before=120)
-    _build_projects_row(table, data, num_id)
+    _build_section_header(table, "EDUCATION", space_before=120)
+    _build_education_row(table, data)
     _build_section_header(table, "HONORS & AWARDS", space_before=120)
     _build_honors_row(table, data, num_id)
 

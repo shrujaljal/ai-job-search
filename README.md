@@ -81,9 +81,10 @@ To stop the app, close that console window.
 | `assets/` | Icon generator and desktop/Start-Menu shortcut script. |
 | `CLAUDE.md` | The candidate profile and the rules the résumé tailoring follows. |
 
-The tailoring is **rule-based**, not AI-generated: it selects the right pre-written
-summary, skills, and project block for the detected role family. Every line stays
-truthful to the candidate's real experience.
+The tailoring is **rule-based**, not AI-generated. It scores the JD against a
+catalog of approved experience titles, bullets, and verified skills, then selects
+the strongest factual combination for the detected role family. Unknown JD terms
+are reported as gaps instead of being copied into the resume.
 
 ---
 
