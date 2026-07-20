@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { api } from '../api'
 import { Card, Button, Field, inputCls, ScoreBar, TierBadge, Spinner } from '../components/ui'
 import { ResultCard } from '../components/ResultCard'
@@ -38,6 +38,8 @@ export default function Search() {
   const [queued, setQueued] = useState<Set<string>>(new Set())
   const [hideBlocked, setHideBlocked] = useState(true)
   const [tailorResults, setTailorResults] = useState<TailorResult[]>([])
+  const settings = useQuery({ queryKey: ['settings'], queryFn: api.getSettings, retry: false })
+  const usingAi = Boolean(settings.data?.llm.enabled)
 
   const search = useMutation<SearchResponse, Error>({
     mutationFn: () => api.search({ roles, location, date_posted: datePosted, job_type: jobType, pages }),
@@ -119,7 +121,12 @@ export default function Search() {
                   <tr key={key(j)} className="border-t border-slate-100 dark:border-slate-800">
                     <td className="px-3 py-2">
                       <input type="checkbox" checked={queued.has(key(j))}
-                        onChange={(e) => { const s = new Set(queued); e.target.checked ? s.add(key(j)) : s.delete(key(j)); setQueued(s) }} />
+                        onChange={(e) => {
+                          const s = new Set(queued)
+                          if (e.target.checked) s.add(key(j))
+                          else s.delete(key(j))
+                          setQueued(s)
+                        }} />
                     </td>
                     <td className="px-3 py-2"><ScoreBar score={j.score} /></td>
                     <td className="px-3 py-2"><TierBadge tier={j.tier} /></td>
@@ -139,7 +146,7 @@ export default function Search() {
             <Button disabled={queued.size === 0 || tailor.isPending} onClick={() => tailor.mutate()}>
               🎯 Tailor Selected Resumes ({queued.size})
             </Button>
-            {tailor.isPending && <Spinner label="Tailoring…" />}
+            {tailor.isPending && <Spinner label={usingAi ? 'AI tailoring against verified profile facts...' : 'Applying rule-based tailoring...'} />}
           </div>
         </>
       )}

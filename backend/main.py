@@ -31,9 +31,10 @@ import config
 import scoring
 import scrapers
 import store
-import resume_builder
 import resume_render
+import tailoring
 import templates as template_store
+from llm import ProviderError, create_provider
 
 app = FastAPI(title="Job Application Agent API", version="2.0.0-dev")
 
@@ -82,6 +83,23 @@ def reset_config(name: str) -> dict:
     if name not in config.CONFIG_NAMES:
         raise HTTPException(404, f"Unknown config '{name}'")
     return config.reset(name)
+
+
+@app.post("/api/llm/test")
+def test_llm_connection() -> dict:
+    llm_settings = config.load("settings").get("llm", {})
+    try:
+        provider = create_provider(llm_settings)
+        raw = provider.complete_json(
+            "Return JSON only.",
+            'Return exactly {"ok": true}.',
+        )
+        parsed = tailoring.parse_provider_json(raw)
+        if parsed.get("ok") is not True:
+            raise ProviderError("Provider returned an unexpected test response.")
+        return {"ok": True, "provider": provider.name, "model": provider.model}
+    except (ProviderError, ValueError) as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 # ── Resume templates ────────────────────────────────────────────────────────
@@ -234,6 +252,7 @@ class TailorRequest(BaseModel):
     job_id: str = ""       # LinkedIn id/url to fetch the JD if jd_text is empty
     location: str = ""
     enforce_sponsorship: bool = False
+    use_llm: bool | None = None
 
 
 @app.post("/api/tailor")
@@ -253,7 +272,16 @@ def tailor(req: TailorRequest) -> dict:
                 "block_reason": ", ".join(sp_matched)}
 
     family, _ = scoring.detect_family(req.role, jd_text, rules)
-    ctx = resume_builder.build_context(profile, content, family)
+    ctx, tailoring_meta = tailoring.build_tailored_context(
+        profile=profile,
+        content=content,
+        family=family,
+        jd_text=jd_text,
+        role=req.role,
+        company=req.company,
+        settings=settings,
+        use_llm=req.use_llm,
+    )
 
     out_dir = _output_root() / _safe(req.company) / _safe(req.role)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -285,6 +313,7 @@ def tailor(req: TailorRequest) -> dict:
         "warnings": ctx.get("warnings", []),
         "sponsorship_warning": (", ".join(sp_matched) if blocked else ""),
         "exp_warning": exp_warning, "pdf_error": pdf_error,
+        **tailoring_meta,
     }
 
 

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Field, inputCls, Card } from '../components/ui'
+import { useMutation } from '@tanstack/react-query'
+import { api } from '../api'
+import { Field, inputCls, Card, Button } from '../components/ui'
 import { Section, SaveBar, Toggle } from './parts'
 import { useSettings } from './useSettings'
 import type { Settings } from '../api'
@@ -7,6 +9,7 @@ import type { Settings } from '../api'
 export function AI() {
   const { settings, save } = useSettings()
   const [draft, setDraft] = useState<Settings | null>(null)
+  const test = useMutation({ mutationFn: api.testLlm })
   useEffect(() => { if (settings && !draft) setDraft(structuredClone(settings)) }, [settings, draft])
   if (!draft) return <p className="text-sm text-slate-500">Loading…</p>
 
@@ -55,6 +58,15 @@ export function AI() {
                 </Field>
               </>
             )}
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Button variant="ghost" disabled={dirty || test.isPending} onClick={() => test.mutate()}>
+                {test.isPending ? 'Testing...' : 'Test connection'}
+              </Button>
+              {dirty && <span className="text-xs text-slate-500">Save changes before testing.</span>}
+              {test.isSuccess && <span className="text-sm text-emerald-600">Connected to {test.data.model}</span>}
+              {test.isError && <span className="text-sm text-rose-600">{test.error.message}</span>}
+            </div>
           </>
         )}
       </Card>

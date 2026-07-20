@@ -9,9 +9,10 @@ Settings UI, and optional multi-provider LLM-assisted tailoring. See
 
 ## Status
 
-**Phases 0-3: complete.** React + FastAPI are wired together, the core app pages
-are live, and Settings now edits profile, scoring rules, resume content,
-appearance, AI settings, and resume templates.
+**Phases 0-4: complete.** React + FastAPI are wired together, the core app pages
+are live, Settings edits all profile and tailoring configuration, and optional
+Claude/OpenAI-assisted resume tailoring runs behind factual guardrails with an
+automatic rule-based fallback.
 
 ## Prerequisites
 
@@ -84,3 +85,14 @@ Optional tokens:
 
 - `{{name}}`, `{{contact}}`, `{{location}}`, `{{phone}}`, `{{email}}`, `{{links}}`
 - `{{coursework}}`, `{{projects}}`, `{{leadership}}`, `{{family}}`
+
+## AI-assisted tailoring
+
+Enable AI under Settings -> AI & Providers, choose Claude or OpenAI, save the
+provider key and model, then use Test connection. Keys stay in the local
+`backend/data/settings.json` file and requests go only to the selected provider.
+
+AI output must cite source bullets and exact profile evidence. Unsupported
+skills, source references, or quantified claims are rejected. If a provider is
+unavailable or its response fails validation, resume generation continues with
+the offline rule-based engine and the result displays the fallback reason.

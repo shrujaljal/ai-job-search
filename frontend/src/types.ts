@@ -35,6 +35,12 @@ export interface TailorResult {
   exp_warning?: string
   pdf_error?: string
   block_reason?: string
+  engine?: 'rules' | 'ai'
+  ai_requested?: boolean
+  ai_fallback?: boolean
+  ai_warning?: string
+  provider?: string
+  model?: string
 }
 
 export interface Application {

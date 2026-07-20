@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { api } from '../api'
 import { Card, Button, Field, inputCls, Spinner } from '../components/ui'
 import { ResultCard } from '../components/ResultCard'
@@ -9,6 +9,8 @@ export default function PasteJD() {
   const [company, setCompany] = useState('')
   const [role, setRole] = useState('')
   const [jd, setJd] = useState('')
+  const settings = useQuery({ queryKey: ['settings'], queryFn: api.getSettings, retry: false })
+  const usingAi = Boolean(settings.data?.llm.enabled)
 
   const tailor = useMutation<TailorResult, Error>({
     mutationFn: () => api.tailor({ company, role, jd_text: jd, enforce_sponsorship: false }),
@@ -33,7 +35,7 @@ export default function PasteJD() {
         </Field>
         <div className="flex items-center gap-3">
           <Button disabled={disabled} onClick={() => tailor.mutate()}>🎯 Generate Tailored Resume</Button>
-          {tailor.isPending && <Spinner label="Reading the JD and tailoring…" />}
+          {tailor.isPending && <Spinner label={usingAi ? 'AI is matching the JD to verified profile facts...' : 'Applying rule-based tailoring...'} />}
         </div>
         {tailor.isError && <p className="text-sm text-red-600">{tailor.error.message}</p>}
       </Card>

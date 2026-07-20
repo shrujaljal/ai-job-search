@@ -64,6 +64,7 @@ export const api = {
   getConfig: <T = Record<string, unknown>>(name: string) => req<T>(`/config/${name}`),
   putConfig: (name: string, data: unknown) => req<{ saved: boolean }>(`/config/${name}`, 'PUT', data),
   resetConfig: <T = Record<string, unknown>>(name: string) => req<T>(`/config/${name}/reset`, 'POST'),
+  testLlm: () => req<{ ok: boolean; provider: string; model: string }>('/llm/test', 'POST'),
 
   listTemplates: () => req<TemplatesResponse>('/templates'),
   uploadTemplate: async (file: File) => {
@@ -89,7 +90,7 @@ export const api = {
 
   tailor: (payload: {
     company: string; role: string; jd_text?: string; job_id?: string
-    location?: string; enforce_sponsorship?: boolean
+    location?: string; enforce_sponsorship?: boolean; use_llm?: boolean
   }) => req<TailorResult>('/tailor', 'POST', payload),
 
   listApplications: () => req<Application[]>('/applications'),
