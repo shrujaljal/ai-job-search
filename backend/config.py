@@ -14,12 +14,14 @@ This module is intentionally dependency-light so it can be imported anywhere.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parent
 DEFAULTS_DIR = BACKEND_DIR / "defaults"
-DATA_DIR = BACKEND_DIR / "data"
+_DATA_OVERRIDE = os.environ.get("JOB_AGENT_DATA_DIR", "").strip()
+DATA_DIR = Path(_DATA_OVERRIDE).expanduser().resolve() if _DATA_OVERRIDE else (BACKEND_DIR / "data")
 
 # The editable config documents (filename stem -> lives in data/ as <stem>.json).
 CONFIG_NAMES = ("profile", "rules", "resume_content", "settings")

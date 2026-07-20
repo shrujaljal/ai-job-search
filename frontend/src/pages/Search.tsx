@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { api } from '../api'
-import { Card, Button, Field, inputCls, ScoreBar, TierBadge, Spinner } from '../components/ui'
+import { Card, Button, EmptyState, Field, inputCls, ScoreBar, TierBadge, Spinner } from '../components/ui'
 import { ResultCard } from '../components/ResultCard'
 import type { Job, SearchResponse, TailorResult } from '../types'
 
@@ -107,7 +107,8 @@ export default function Search() {
             </label>
           </div>
 
-          <Card className="overflow-x-auto p-0">
+          {visible.length === 0 ? <EmptyState title="No matching jobs found"
+            description={jobs.length > 0 ? 'All results are hidden by the sponsorship filter. Show blocked roles to review them.' : 'Try broader role terms, another location, or a wider posting date range.'} /> : <Card className="overflow-x-auto p-0">
             <table className="w-full text-sm">
               <thead className="text-left text-xs uppercase tracking-wide text-slate-400">
                 <tr>
@@ -140,7 +141,7 @@ export default function Search() {
                 ))}
               </tbody>
             </table>
-          </Card>
+          </Card>}
 
           <div className="flex items-center gap-3">
             <Button disabled={queued.size === 0 || tailor.isPending} onClick={() => tailor.mutate()}>

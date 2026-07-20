@@ -23,7 +23,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field as PydanticField
 
 import re
 
@@ -100,6 +100,134 @@ def test_llm_connection() -> dict:
         return {"ok": True, "provider": provider.name, "model": provider.model}
     except (ProviderError, ValueError) as exc:
         raise HTTPException(400, str(exc)) from exc
+
+
+# ── First-run onboarding ────────────────────────────────────────────────────
+class OnboardingRequest(BaseModel):
+    full_name: str
+    display_name: str = ""
+    location: str = ""
+    work_authorization: str = ""
+    needs_sponsorship: bool = False
+    target_roles: list[str]
+    preferred_locations: list[str] = PydanticField(default_factory=list)
+    max_years_experience: int = 4
+    output_dir: str = ""
+    ai_enabled: bool = False
+    ai_provider: str = "claude"
+    ai_model: str = ""
+    ai_api_key: str = ""
+
+
+def _profile_is_configured(profile: dict) -> bool:
+    name = str(profile.get("identity", {}).get("name", "")).strip().lower()
+    return bool(name and name not in {"your name", "name"})
+
+
+@app.get("/api/onboarding")
+def onboarding_status() -> dict:
+    settings = config.load("settings")
+    profile = config.load("profile")
+    explicit = settings.get("onboarding_complete")
+    complete = bool(explicit) if explicit is not None else _profile_is_configured(profile)
+    rules = config.load("rules")
+    identity = profile.get("identity", {})
+    llm = settings.get("llm", {})
+    provider = llm.get("provider", "claude")
+    return {
+        "complete": complete,
+        "legacy_inferred": explicit is None and complete,
+        "role_families": [
+            {"name": family.get("name", ""), "tier": family.get("tier", 3)}
+            for family in rules.get("role_families", []) if family.get("name")
+        ],
+        "defaults": {
+            "full_name": identity.get("name", "") if _profile_is_configured(profile) else "",
+            "display_name": settings.get("username", ""),
+            "location": identity.get("location", ""),
+            "work_authorization": identity.get("work_authorization", ""),
+            "needs_sponsorship": bool(identity.get("needs_sponsorship")),
+            "target_roles": [
+                family.get("name") for family in rules.get("role_families", [])
+                if family.get("name") and int(family.get("tier", 3)) == 1
+            ],
+            "preferred_locations": rules.get("preferred_locations", []),
+            "max_years_experience": rules.get("max_years_experience", 4),
+            "output_dir": settings.get("output_dir", ""),
+            "ai_enabled": bool(llm.get("enabled")),
+            "ai_provider": provider,
+            "ai_model": (llm.get("model", "") if provider == "claude"
+                         else llm.get("openai_model", "")),
+            "ai_api_key": "",
+        },
+    }
+
+
+@app.post("/api/onboarding")
+def complete_onboarding(req: OnboardingRequest) -> dict:
+    name = req.full_name.strip()
+    selected_roles = {role.strip() for role in req.target_roles if role.strip()}
+    if not name:
+        raise HTTPException(400, "Full name is required.")
+    if not selected_roles:
+        raise HTTPException(400, "Choose at least one target role family.")
+    if not 0 <= req.max_years_experience <= 30:
+        raise HTTPException(400, "Maximum years of experience must be between 0 and 30.")
+    if req.ai_provider not in {"claude", "openai"}:
+        raise HTTPException(400, "Choose Claude or OpenAI as the AI provider.")
+
+    profile = config.load("profile")
+    identity = profile.setdefault("identity", {})
+    identity.update({
+        "name": name,
+        "location": req.location.strip(),
+        "work_authorization": req.work_authorization.strip(),
+        "needs_sponsorship": req.needs_sponsorship,
+    })
+
+    rules = config.load("rules")
+    known_roles = {family.get("name") for family in rules.get("role_families", [])}
+    unknown_roles = selected_roles - known_roles
+    if unknown_roles:
+        raise HTTPException(400, f"Unknown role families: {', '.join(sorted(unknown_roles))}")
+    for family in rules.get("role_families", []):
+        if family.get("name") in selected_roles:
+            family["tier"] = 1
+        elif int(family.get("tier", 3)) == 1:
+            family["tier"] = 2
+    rules["preferred_locations"] = list(dict.fromkeys(
+        location.strip().lower() for location in req.preferred_locations if location.strip()))
+    rules["max_years_experience"] = req.max_years_experience
+
+    settings = config.load("settings")
+    settings.update({
+        "candidate_name": name,
+        "username": req.display_name.strip() or name.split()[0],
+        "output_dir": req.output_dir.strip(),
+        "onboarding_complete": True,
+    })
+    llm = settings.setdefault("llm", {})
+    llm["enabled"] = req.ai_enabled
+    llm["provider"] = req.ai_provider
+    if req.ai_provider == "claude":
+        llm["model"] = req.ai_model.strip() or llm.get("model", "claude-sonnet-5")
+    else:
+        llm["openai_model"] = req.ai_model.strip() or llm.get("openai_model", "gpt-4o")
+    if req.ai_api_key:
+        llm.setdefault("api_keys", {})[req.ai_provider] = req.ai_api_key.strip()
+
+    config.save("profile", profile)
+    config.save("rules", rules)
+    config.save("settings", settings)
+    return {"complete": True}
+
+
+@app.post("/api/onboarding/reset")
+def reset_onboarding() -> dict:
+    settings = config.load("settings")
+    settings["onboarding_complete"] = False
+    config.save("settings", settings)
+    return {"complete": False}
 
 
 # ── Resume templates ────────────────────────────────────────────────────────

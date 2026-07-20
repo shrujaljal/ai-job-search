@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { api, type Health } from './api'
 import { ThemeControls } from './components/ThemeControls'
+import { Onboarding } from './components/Onboarding'
+import { ErrorState, PageLoading } from './components/ui'
 import Dashboard from './pages/Dashboard'
 import Tracker from './pages/Tracker'
 import Search from './pages/Search'
@@ -51,6 +53,15 @@ export default function App() {
   const [page, setPage] = useState('dashboard')
   const active = PAGES.find((p) => p.key === page) ?? PAGES[0]
   const username = useUsername()
+  const onboarding = useQuery({ queryKey: ['onboarding'], queryFn: api.getOnboarding, retry: false })
+
+  if (onboarding.isLoading) return <PageLoading label="Starting the app..." />
+  if (onboarding.isError) return (
+    <main className="mx-auto max-w-xl px-4 py-20">
+      <ErrorState message={onboarding.error.message} onRetry={() => onboarding.refetch()} />
+    </main>
+  )
+  if (onboarding.data && !onboarding.data.complete) return <Onboarding status={onboarding.data} />
 
   return (
     <div className="min-h-screen">

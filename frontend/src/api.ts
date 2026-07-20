@@ -57,9 +57,36 @@ export interface TemplatesResponse {
   templates: ResumeTemplate[]
 }
 
+export interface OnboardingStatus {
+  complete: boolean
+  legacy_inferred: boolean
+  role_families: { name: string; tier: number }[]
+  defaults: OnboardingPayload
+}
+
+export interface OnboardingPayload {
+  full_name: string
+  display_name: string
+  location: string
+  work_authorization: string
+  needs_sponsorship: boolean
+  target_roles: string[]
+  preferred_locations: string[]
+  max_years_experience: number
+  output_dir: string
+  ai_enabled: boolean
+  ai_provider: 'claude' | 'openai'
+  ai_model: string
+  ai_api_key: string
+}
+
 export const api = {
   health: () => req<Health>('/health'),
   getSettings: () => req<Settings>('/config/settings'),
+  getOnboarding: () => req<OnboardingStatus>('/onboarding'),
+  completeOnboarding: (payload: OnboardingPayload) =>
+    req<{ complete: boolean }>('/onboarding', 'POST', payload),
+  resetOnboarding: () => req<{ complete: boolean }>('/onboarding/reset', 'POST'),
 
   getConfig: <T = Record<string, unknown>>(name: string) => req<T>(`/config/${name}`),
   putConfig: (name: string, data: unknown) => req<{ saved: boolean }>(`/config/${name}`, 'PUT', data),

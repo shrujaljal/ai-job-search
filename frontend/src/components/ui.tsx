@@ -59,6 +59,32 @@ export function Spinner({ label }: { label?: string }) {
   )
 }
 
+export function PageLoading({ label = 'Loading...' }: { label?: string }) {
+  return <div className="flex min-h-48 items-center justify-center"><Spinner label={label} /></div>
+}
+
+export function EmptyState({ title, description, action }: {
+  title: string; description: string; action?: ReactNode
+}) {
+  return (
+    <div className="rounded-lg border border-dashed border-slate-300 px-5 py-10 text-center dark:border-slate-700">
+      <h2 className="text-base font-semibold">{title}</h2>
+      <p className="mx-auto mt-1 max-w-lg text-sm text-slate-500">{description}</p>
+      {action && <div className="mt-4">{action}</div>}
+    </div>
+  )
+}
+
+export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <div className="rounded-lg border border-rose-200 bg-rose-50 px-5 py-6 dark:border-rose-900 dark:bg-rose-950">
+      <h2 className="font-semibold text-rose-800 dark:text-rose-200">Something went wrong</h2>
+      <p className="mt-1 text-sm text-rose-700 dark:text-rose-300">{message}</p>
+      {onRetry && <Button variant="ghost" className="mt-4" onClick={onRetry}>Try again</Button>}
+    </div>
+  )
+}
+
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
@@ -69,4 +95,4 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 }
 
 export const inputCls =
-  'w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-transparent focus:ring-2 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-100 focus:ring-[var(--ring)]'
+  'min-w-0 w-full rounded-xl border border-slate-300 bg-white/80 px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-transparent focus:ring-2 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-100 focus:ring-[var(--ring)]'

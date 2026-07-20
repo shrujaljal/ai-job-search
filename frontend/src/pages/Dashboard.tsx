@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
 import { api } from '../api'
-import { Card, Button, inputCls } from '../components/ui'
+import { Card, Button, EmptyState, ErrorState, PageLoading, inputCls } from '../components/ui'
 import { Mascot } from '../components/Mascot'
 
 function useFirstName() {
@@ -114,9 +114,13 @@ const BAR_COLORS: Record<string, string> = {
 
 export default function Dashboard() {
   const name = useFirstName()
-  const { data } = useQuery({ queryKey: ['dashboard'], queryFn: api.getDashboard, retry: false })
+  const dashboard = useQuery({ queryKey: ['dashboard'], queryFn: api.getDashboard, retry: false })
+  const data = dashboard.data
   const streak = data?.streak?.current ?? 0
   const chartData = (data?.statuses ?? []).map((s) => ({ status: s, count: data?.by_status[s] ?? 0 }))
+
+  if (dashboard.isLoading) return <PageLoading label="Loading dashboard..." />
+  if (dashboard.isError) return <ErrorState message={dashboard.error.message} onRetry={() => dashboard.refetch()} />
 
   return (
     <div className="space-y-6">
@@ -125,11 +129,8 @@ export default function Dashboard() {
       <TodaysPlan name={name} />
 
       {!data || data.total === 0 ? (
-        <Card>
-          <p className="text-sm text-slate-500">
-            No applications tracked yet. Tailor a résumé and add it to the tracker, or add entries in the Tracker tab.
-          </p>
-        </Card>
+        <EmptyState title="Your pipeline is ready"
+          description="Tailor a résumé and add it to the tracker, or create an application manually in the Tracker tab." />
       ) : (
         <>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-5">

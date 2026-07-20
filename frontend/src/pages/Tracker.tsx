@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api'
-import { Card, Button, inputCls } from '../components/ui'
+import { Card, Button, EmptyState, ErrorState, PageLoading, inputCls } from '../components/ui'
 import { STATUSES, type Application } from '../types'
 
 function AddForm() {
@@ -79,7 +79,10 @@ function exportCsv(apps: Application[]) {
 }
 
 export default function Tracker() {
-  const { data: apps = [] } = useQuery({ queryKey: ['applications'], queryFn: api.listApplications, retry: false })
+  const applications = useQuery({ queryKey: ['applications'], queryFn: api.listApplications, retry: false })
+  const apps = applications.data ?? []
+  if (applications.isLoading) return <PageLoading label="Loading applications..." />
+  if (applications.isError) return <ErrorState message={applications.error.message} onRetry={() => applications.refetch()} />
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -88,7 +91,7 @@ export default function Tracker() {
       </div>
       <AddForm />
       {apps.length === 0 ? (
-        <Card><p className="text-sm text-slate-500">No applications tracked yet.</p></Card>
+        <EmptyState title="No applications yet" description="Add a role manually above or tailor a résumé and send it here from the result." />
       ) : (
         <Card className="overflow-x-auto p-0">
           <table className="w-full text-sm">

@@ -5,6 +5,7 @@
   "theme": "system",
   "accent": "violet",
   "active_template": "default",
+  "onboarding_complete": false,
   "llm": {
     "enabled": false,
     "provider": "claude",

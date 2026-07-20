@@ -9,10 +9,10 @@ Settings UI, and optional multi-provider LLM-assisted tailoring. See
 
 ## Status
 
-**Phases 0-4: complete.** React + FastAPI are wired together, the core app pages
-are live, Settings edits all profile and tailoring configuration, and optional
-Claude/OpenAI-assisted resume tailoring runs behind factual guardrails with an
-automatic rule-based fallback.
+**Phases 0-5: complete.** React + FastAPI are wired together, the core app pages
+are live, Settings edits all profile and tailoring configuration, optional
+Claude/OpenAI-assisted resume tailoring runs behind factual guardrails, and new
+installations open with a guided setup flow plus polished loading and empty states.
 
 ## Prerequisites
 
@@ -96,3 +96,14 @@ AI output must cite source bullets and exact profile evidence. Unsupported
 skills, source references, or quantified claims are rejected. If a provider is
 unavailable or its response fails validation, resume generation continues with
 the offline rule-based engine and the result displays the fallback reason.
+
+## First-run setup
+
+Fresh installations open a four-step setup flow for identity and work
+authorization, target role families and locations, generated-file output, and
+optional AI configuration. Existing configured V2 profiles are detected and are
+not forced through setup. Run the wizard again from Settings -> Account without
+deleting current values.
+
+For isolated testing or portable deployments, set `JOB_AGENT_DATA_DIR` to use a
+configuration directory other than `backend/data/`.
