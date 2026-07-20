@@ -36,7 +36,7 @@ import tailoring
 import templates as template_store
 from llm import ProviderError, create_provider
 
-app = FastAPI(title="Job Application Agent API", version="2.0.0-dev")
+app = FastAPI(title="Job Application Agent API", version="2.0.0")
 
 # In dev the React app runs on its own port (Vite, 5173); allow it to call us.
 app.add_middleware(

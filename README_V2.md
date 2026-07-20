@@ -1,4 +1,4 @@
-# Job Application Agent — V2 (in development)
+# Job Application Agent — V2.0
 
 V2 is a cross-platform rewrite: **React front end + FastAPI back end**, with
 everything (profile, scoring rules, résumé content, settings) editable through a
@@ -9,17 +9,18 @@ Settings UI, and optional multi-provider LLM-assisted tailoring. See
 
 ## Status
 
-**Phases 0-5: complete.** React + FastAPI are wired together, the core app pages
+**Phases 0-6: complete.** React + FastAPI are wired together, the core app pages
 are live, Settings edits all profile and tailoring configuration, optional
 Claude/OpenAI-assisted resume tailoring runs behind factual guardrails, and new
-installations open with a guided setup flow plus polished loading and empty states.
+installations open with a guided setup flow, and cross-platform launchers provide
+installation diagnostics, production builds, and one-command startup.
 
 ## Prerequisites
 
 - **Python 3.10+**
 - **Node.js 18+** (front end)
-- **Bun** (LinkedIn scraper) — added in a later phase
-- **LibreOffice** (cross-platform PDF) — added in a later phase
+- **Bun** (optional; required for LinkedIn search)
+- **LibreOffice** (recommended for cross-platform PDF; Word also works on Windows)
 
 ## First-time setup
 

@@ -1,15 +1,16 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { api, type Health } from './api'
 import { ThemeControls } from './components/ThemeControls'
 import { Onboarding } from './components/Onboarding'
 import { ErrorState, PageLoading } from './components/ui'
-import Dashboard from './pages/Dashboard'
-import Tracker from './pages/Tracker'
-import Search from './pages/Search'
-import PasteJD from './pages/PasteJD'
-import Settings from './pages/Settings'
+
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Tracker = lazy(() => import('./pages/Tracker'))
+const Search = lazy(() => import('./pages/Search'))
+const PasteJD = lazy(() => import('./pages/PasteJD'))
+const Settings = lazy(() => import('./pages/Settings'))
 
 const SETTINGS_PAGE = { key: 'settings', label: 'Settings', icon: '⚙️', el: <Settings /> }
 
@@ -116,7 +117,7 @@ export default function App() {
           <motion.div key={page}
             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }}>
-            {active.el}
+            <Suspense fallback={<PageLoading label="Loading page..." />}>{active.el}</Suspense>
           </motion.div>
         </AnimatePresence>
       </main>

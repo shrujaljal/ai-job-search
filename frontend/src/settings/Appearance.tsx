@@ -1,4 +1,4 @@
-import { ACCENTS, useTheme, type Accent } from '../theme'
+import { ACCENTS, useTheme, type Accent } from '../theme-context'
 import { Section } from './parts'
 import { Card } from '../components/ui'
 

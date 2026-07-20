@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { ACCENTS, useTheme } from '../theme'
+import { ACCENTS, useTheme } from '../theme-context'
 
 const DOT: Record<string, string> = {
   violet: '#7c6cf0', emerald: '#10b981', sky: '#0ea5e9', rose: '#f43f5e', amber: '#f59e0b',

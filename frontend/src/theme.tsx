@@ -1,16 +1,5 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-
-export type Mode = 'light' | 'dark'
-export type Accent = 'violet' | 'emerald' | 'sky' | 'rose' | 'amber'
-export const ACCENTS: Accent[] = ['violet', 'emerald', 'sky', 'rose', 'amber']
-
-interface ThemeCtx {
-  mode: Mode
-  accent: Accent
-  toggleMode: () => void
-  setAccent: (a: Accent) => void
-}
-const Ctx = createContext<ThemeCtx | null>(null)
+import { useEffect, useState, type ReactNode } from 'react'
+import { ThemeContext, type Accent, type Mode } from './theme-context'
 
 function initialMode(): Mode {
   const saved = localStorage.getItem('theme-mode') as Mode | null
@@ -34,18 +23,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [accent])
 
   return (
-    <Ctx.Provider value={{
+    <ThemeContext.Provider value={{
       mode, accent,
       toggleMode: () => setMode((m) => (m === 'dark' ? 'light' : 'dark')),
       setAccent: setAccentState,
     }}>
       {children}
-    </Ctx.Provider>
+    </ThemeContext.Provider>
   )
-}
-
-export function useTheme() {
-  const c = useContext(Ctx)
-  if (!c) throw new Error('useTheme outside ThemeProvider')
-  return c
 }

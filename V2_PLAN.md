@@ -196,4 +196,5 @@ Each phase ends with a working, runnable app and a Git checkpoint.
 
 ---
 
-*This plan is a proposal for review. Nothing is built until it's approved.*
+*Implementation status: Phases 0-6 were completed on the `v2` branch for the
+V2.0 release. This document is retained as the architecture and decision record.*
