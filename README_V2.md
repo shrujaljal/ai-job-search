@@ -60,32 +60,38 @@ V2_PLAN.md           # the full V2 plan
 Everything the app uses is JSON in `backend/data/` (copied from `backend/defaults/`
 on first run):
 
-- `profile.json` — your identity, experience, education, skills, projects, leadership
+- `profile.json` — identity, resume sources, section order/headings, experience,
+  education, skills, projects, leadership, honors, and custom sections
 - `rules.json` — scoring rules (role families, target companies, locations, red flags,
   seniority, years cap, sponsorship blockers, weights)
 - `resume_content.json` — per-family summaries, skills, projects, bullet library
-- `settings.json` — LLM provider/keys/toggle, theme, output folder, active template
+- `settings.json` — LLM provider/keys/toggle, theme, and output folder
 
 The API exposes these at `GET/PUT /api/config/{name}` and
 `POST /api/config/{name}/reset`.
 
-## Resume templates
+## Profile sources and resume structure
 
-Settings -> Templates lets you use the built-in default resume design or upload a
-custom `.docx` file. Uploaded templates are stored locally in `backend/data/`
-and are never committed.
+Settings -> Profile accepts up to ten `.docx`, `.pdf`, `.md`, or `.markdown`
+files at once. The first uploaded resume supplies the section order and headings;
+later files add facts and sections. Imported sources are stored locally under
+`backend/data/profile_sources/` and are never committed.
 
-Custom templates use placeholder tokens. Required tokens:
+The importer allocates identity, experience, education, skills, projects,
+leadership, honors, and unknown custom sections into the profile. It merges bullet
+libraries within the matching experience or section and removes exact and close
+duplicates. The Profile editor lets users revise the imported facts, headings,
+and section order.
 
-- `{{summary}}`
-- `{{experience}}`
-- `{{education}}`
-- `{{skills}}`
+The uploaded file is a content and structure blueprint. DOCX, PDF, and Markdown
+do not provide a common safe way to reproduce arbitrary visual styling, so the
+renderer uses the app's stable built-in typography while following the imported
+heading names and section order.
 
-Optional tokens:
-
-- `{{name}}`, `{{contact}}`, `{{location}}`, `{{phone}}`, `{{email}}`, `{{links}}`
-- `{{coursework}}`, `{{projects}}`, `{{leadership}}`, `{{family}}`
+Use **Download AI prompts** in Profile to create a Markdown file containing one
+factual bullet-expansion prompt per experience. Run those prompts in a preferred
+chatbot, save its Markdown response, and import that file back into Profile. New
+unique bullets are merged into the appropriate experience.
 
 ## AI-assisted tailoring
 

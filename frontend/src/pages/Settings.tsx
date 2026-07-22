@@ -6,7 +6,6 @@ import { AI } from '../settings/AI'
 import { ContentEditor } from '../settings/Content'
 import { ProfileEditor } from '../settings/Profile'
 import { RulesEditor } from '../settings/Rules'
-import { Templates } from '../settings/Templates'
 
 const SECTIONS = [
   { key: 'account', label: '👤 Account', el: <Account /> },
@@ -15,7 +14,6 @@ const SECTIONS = [
   { key: 'profile', label: '📇 Profile', el: <ProfileEditor /> },
   { key: 'rules', label: '🎯 Scoring Rules', el: <RulesEditor /> },
   { key: 'content', label: '📄 Résumé Content', el: <ContentEditor /> },
-  { key: 'templates', label: '🧩 Templates', el: <Templates /> },
 ]
 
 export default function Settings() {

@@ -28,7 +28,6 @@ from resume_engine.generator import (  # low-level, generic helpers
 
 NUM_ID = "27"  # bullet numbering defined in base_template.docx
 EMAIL_REL, LINK_REL = "rId6", "rId7"
-TOKEN_RE = re.compile(r"{{\s*([a-zA-Z0-9_]+)\s*}}")
 
 
 def _set_rel_target(doc, rel_id: str, target: str) -> None:
@@ -38,11 +37,8 @@ def _set_rel_target(doc, rel_id: str, target: str) -> None:
         pass
 
 
-def render_docx(context: dict, output_path: str, template_path: str | Path | None = None) -> str:
+def render_docx(context: dict, output_path: str) -> str:
     """Build the default-template DOCX from a résumé context. Returns the path."""
-    if template_path:
-        return render_token_docx(context, output_path, template_path)
-
     ident = context.get("identity", {})
     doc = Document(str(Path(__file__).parent / "resume_engine" / "base_template.docx"))
 
@@ -79,191 +75,167 @@ def render_docx(context: dict, output_path: str, template_path: str | Path | Non
         p.append(_hyperlink_run(LINK_REL, link0.get("label") or "Link"))
     _span_cell(tr, [p])
 
-    # Summary
-    _build_section_header(table, "PROFESSIONAL SUMMARY")
-    tr = _new_row(table)
-    p = _para(justify=True)
-    p.append(_run(context.get("summary", ""), sz=SZ))
-    _span_cell(tr, [p])
-
-    # Experience
-    _build_section_header(table, "EXPERIENCE", space_before=120)
-    for e in context.get("experiences", []):
-        _build_experience_header(table, e.get("company", ""), e.get("role", ""), e.get("date", ""))
-        _build_bullets_row(table, e.get("bullets", []), NUM_ID)
-
-    # Education
-    _build_section_header(table, "EDUCATION", space_before=120)
-    tr = _new_row(table)
-    paras = []
-    for i, ed in enumerate(context.get("education", [])):
-        deg = ed.get("degree", "")
-        if ed.get("field"):
-            deg = f"{deg}, {ed['field']}" if deg else ed["field"]
-        tail = ""
-        if ed.get("institution"):
-            tail += f" - {ed['institution']}"
-        if ed.get("gpa"):
-            tail += f" (GPA: {ed['gpa']})"
-        if ed.get("graduation"):
-            tail += f" — {ed['graduation']}"
-        pe = _para()
-        pe.append(_run(deg, bold=True, sz=SZ))
-        if tail:
-            pe.append(_run(tail, sz=SZ))
-        paras.append(pe)
-        if ed.get("honors"):
-            ph = _para()
-            ph.append(_run("Honors: " + ", ".join(ed["honors"]), italic=True, sz=SZ))
-            paras.append(ph)
-        if i == 0 and context.get("coursework"):
-            pc = _para()
-            pc.append(_run("Relevant Coursework: ", italic=True, sz=SZ))
-            pc.append(_run(context["coursework"], italic=True, sz=SZ))
-            paras.append(pc)
-    _span_cell(tr, paras)
-
-    # Projects & Leadership
-    _build_section_header(table, "PROJECTS & LEADERSHIP", space_before=120)
-    tr = _new_row(table)
-    paras = []
-    for proj in context.get("projects", []):
-        tp = _para()
-        tp.append(_run(proj.get("title", ""), bold=True, sz=SZ))
-        paras.append(tp)
-        for b in proj.get("bullets", []):
-            paras.append(_bullet_para(NUM_ID, b))
-    for ld in context.get("leadership", []):
-        title = " | ".join([x for x in [ld.get("organization", ""), ld.get("role", "")] if x])
-        lp = _para()
-        lp.append(_run(title, bold=True, sz=SZ))
-        paras.append(lp)
-        for b in ld.get("bullets", []):
-            paras.append(_bullet_para(NUM_ID, b))
-    _span_cell(tr, paras)
-
-    # Skills
-    _build_section_header(table, "SKILLS", space_before=120)
-    tr = _new_row(table)
-    paras = []
-    for cat in context.get("skills", []):
-        p = _bullet_para(NUM_ID, "")
-        for child in list(p):
-            if child.tag == qn("w:r"):
-                p.remove(child)
-        p.append(_run(f"{cat.get('name', '')}:", bold=True, sz=SZ))
-        p.append(_run(f" {cat.get('items', '')}", sz=SZ))
-        paras.append(p)
-    _span_cell(tr, paras)
+    blueprint = context.get("resume_blueprint", {})
+    order = blueprint.get("section_order") or [
+        "summary", "experience", "education", "projects_leadership", "skills"
+    ]
+    headings = blueprint.get("section_headings", {})
+    rendered = 0
+    for key in order:
+        if not _has_section(context, key):
+            continue
+        title = headings.get(key) or _default_heading(key, context)
+        _build_section_header(table, title, space_before=0 if rendered == 0 else 120)
+        _render_section(table, context, key)
+        rendered += 1
 
     doc.save(output_path)
     return output_path
+
+
+def _has_section(context: dict, key: str) -> bool:
+    if key == "summary":
+        return bool(context.get("summary"))
+    if key == "experience":
+        return bool(context.get("experiences"))
+    if key in {"education", "projects", "leadership", "skills", "honors"}:
+        return bool(context.get(key))
+    if key == "projects_leadership":
+        return bool(context.get("projects") or context.get("leadership"))
+    if key.startswith("custom:"):
+        custom_id = key.split(":", 1)[1]
+        return any(
+            section.get("id") == custom_id and section.get("lines")
+            for section in context.get("custom_sections", [])
+        )
+    return False
+
+
+def _default_heading(key: str, context: dict) -> str:
+    defaults = {
+        "summary": "Professional Summary",
+        "experience": "Experience",
+        "education": "Education",
+        "projects": "Projects",
+        "leadership": "Leadership",
+        "projects_leadership": "Projects & Leadership",
+        "skills": "Skills",
+        "honors": "Honors & Awards",
+    }
+    if key.startswith("custom:"):
+        custom_id = key.split(":", 1)[1]
+        match = next(
+            (section for section in context.get("custom_sections", []) if section.get("id") == custom_id),
+            {},
+        )
+        return match.get("title", "Additional Information")
+    return defaults.get(key, key.replace("_", " ").title())
+
+
+def _render_section(table, context: dict, key: str) -> None:
+    if key == "summary":
+        tr = _new_row(table)
+        p = _para(justify=True)
+        p.append(_run(context.get("summary", ""), sz=SZ))
+        _span_cell(tr, [p])
+    elif key == "experience":
+        for experience in context.get("experiences", []):
+            _build_experience_header(
+                table,
+                experience.get("company", ""),
+                experience.get("role", ""),
+                experience.get("date", ""),
+            )
+            _build_bullets_row(table, experience.get("bullets", []), NUM_ID)
+    elif key == "education":
+        _render_education(table, context)
+    elif key in {"projects", "leadership", "projects_leadership"}:
+        include_projects = key in {"projects", "projects_leadership"}
+        include_leadership = key in {"leadership", "projects_leadership"}
+        _render_projects_leadership(table, context, include_projects, include_leadership)
+    elif key == "skills":
+        _render_skills(table, context.get("skills", []))
+    elif key == "honors":
+        _build_bullets_row(table, context.get("honors", []), NUM_ID)
+    elif key.startswith("custom:"):
+        custom_id = key.split(":", 1)[1]
+        section = next(
+            (item for item in context.get("custom_sections", []) if item.get("id") == custom_id),
+            {},
+        )
+        lines = [re.sub(r"^\s*(?:[-*\u2022]|\d+[.)])\s+", "", line) for line in section.get("lines", [])]
+        _build_bullets_row(table, lines, NUM_ID)
+
+
+def _render_education(table, context: dict) -> None:
+    tr = _new_row(table)
+    paragraphs = []
+    for index, education in enumerate(context.get("education", [])):
+        degree = education.get("degree", "")
+        if education.get("field"):
+            degree = f"{degree}, {education['field']}" if degree else education["field"]
+        tail = ""
+        if education.get("institution"):
+            tail += f" - {education['institution']}"
+        if education.get("gpa"):
+            tail += f" (GPA: {education['gpa']})"
+        if education.get("graduation"):
+            tail += f" - {education['graduation']}"
+        paragraph = _para()
+        paragraph.append(_run(degree, bold=True, sz=SZ))
+        if tail:
+            paragraph.append(_run(tail, sz=SZ))
+        paragraphs.append(paragraph)
+        if education.get("honors"):
+            honors = _para()
+            honors.append(_run("Honors: " + ", ".join(education["honors"]), italic=True, sz=SZ))
+            paragraphs.append(honors)
+        if index == 0 and context.get("coursework"):
+            coursework = _para()
+            coursework.append(_run("Relevant Coursework: ", italic=True, sz=SZ))
+            coursework.append(_run(context["coursework"], italic=True, sz=SZ))
+            paragraphs.append(coursework)
+    _span_cell(tr, paragraphs)
+
+
+def _render_projects_leadership(
+    table, context: dict, include_projects: bool, include_leadership: bool
+) -> None:
+    tr = _new_row(table)
+    paragraphs = []
+    if include_projects:
+        for project in context.get("projects", []):
+            title = _para()
+            title.append(_run(project.get("title", ""), bold=True, sz=SZ))
+            paragraphs.append(title)
+            paragraphs.extend(_bullet_para(NUM_ID, bullet) for bullet in project.get("bullets", []))
+    if include_leadership:
+        for leadership in context.get("leadership", []):
+            text = " | ".join(
+                value for value in [leadership.get("organization", ""), leadership.get("role", "")] if value
+            )
+            title = _para()
+            title.append(_run(text, bold=True, sz=SZ))
+            paragraphs.append(title)
+            paragraphs.extend(_bullet_para(NUM_ID, bullet) for bullet in leadership.get("bullets", []))
+    _span_cell(tr, paragraphs)
+
+
+def _render_skills(table, skills: list[dict]) -> None:
+    tr = _new_row(table)
+    paragraphs = []
+    for category in skills:
+        paragraph = _bullet_para(NUM_ID, "")
+        for child in list(paragraph):
+            if child.tag == qn("w:r"):
+                paragraph.remove(child)
+        paragraph.append(_run(f"{category.get('name', '')}:", bold=True, sz=SZ))
+        paragraph.append(_run(f" {category.get('items', '')}", sz=SZ))
+        paragraphs.append(paragraph)
+    _span_cell(tr, paragraphs)
 
 
 # ── Cross-platform PDF ────────────────────────────────────────────────────────
-def render_token_docx(context: dict, output_path: str, template_path: str | Path) -> str:
-    """Render a user-uploaded DOCX template containing {{token}} placeholders."""
-    doc = Document(str(template_path))
-    values = _token_values(context)
-
-    for paragraph in doc.paragraphs:
-        _replace_tokens_in_paragraph(paragraph, values)
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                for paragraph in cell.paragraphs:
-                    _replace_tokens_in_paragraph(paragraph, values)
-
-    doc.save(output_path)
-    return output_path
-
-
-def _token_values(context: dict) -> dict[str, str]:
-    ident = context.get("identity", {})
-    links = ident.get("links", []) or []
-    link_text = "\n".join(
-        " - ".join([x for x in [link.get("label", ""), link.get("url", "")] if x])
-        for link in links
-    )
-    contact_bits = [ident.get("location", ""), ident.get("phone", ""), ident.get("email", "")]
-    if link_text:
-        contact_bits.append(link_text)
-
-    return {
-        "name": ident.get("name", ""),
-        "location": ident.get("location", ""),
-        "phone": ident.get("phone", ""),
-        "email": ident.get("email", ""),
-        "links": link_text,
-        "contact": " | ".join([bit for bit in contact_bits if bit]),
-        "summary": context.get("summary", ""),
-        "experience": _format_experience(context.get("experiences", [])),
-        "education": _format_education(context.get("education", [])),
-        "coursework": context.get("coursework", ""),
-        "projects": _format_titled_bullets(context.get("projects", []), "title"),
-        "leadership": _format_titled_bullets(context.get("leadership", []), "organization"),
-        "skills": _format_skills(context.get("skills", [])),
-        "family": context.get("family", ""),
-    }
-
-
-def _replace_tokens_in_paragraph(paragraph, values: dict[str, str]) -> None:
-    text = paragraph.text
-    if "{{" not in text:
-        return
-    replaced = TOKEN_RE.sub(lambda m: values.get(m.group(1), ""), text)
-    for run in paragraph.runs:
-        run.text = ""
-    run = paragraph.add_run()
-    lines = replaced.splitlines() or [""]
-    for i, line in enumerate(lines):
-        if i:
-            run.add_break()
-        run.add_text(line)
-
-
-def _format_experience(experiences: list[dict]) -> str:
-    blocks = []
-    for exp in experiences:
-        header = " | ".join([x for x in [exp.get("company", ""), exp.get("role", ""), exp.get("date", "")] if x])
-        bullets = "\n".join(f"- {b}" for b in exp.get("bullets", []) if b)
-        blocks.append("\n".join([x for x in [header, bullets] if x]))
-    return "\n\n".join(blocks)
-
-
-def _format_education(education: list[dict]) -> str:
-    blocks = []
-    for ed in education:
-        degree = ed.get("degree", "")
-        if ed.get("field"):
-            degree = f"{degree}, {ed['field']}" if degree else ed["field"]
-        line = " - ".join([x for x in [degree, ed.get("institution", ""), ed.get("graduation", "")] if x])
-        if ed.get("gpa"):
-            line = f"{line} (GPA: {ed['gpa']})" if line else f"GPA: {ed['gpa']}"
-        honors = ", ".join(ed.get("honors", []))
-        blocks.append("\n".join([x for x in [line, f"Honors: {honors}" if honors else ""] if x]))
-    return "\n\n".join(blocks)
-
-
-def _format_titled_bullets(items: list[dict], title_key: str) -> str:
-    blocks = []
-    for item in items:
-        title = item.get(title_key, "")
-        if title_key == "organization" and item.get("role"):
-            title = " | ".join([x for x in [title, item.get("role", "")] if x])
-        bullets = "\n".join(f"- {b}" for b in item.get("bullets", []) if b)
-        blocks.append("\n".join([x for x in [title, bullets] if x]))
-    return "\n\n".join(blocks)
-
-
-def _format_skills(skills: list[dict]) -> str:
-    return "\n".join(
-        f"{cat.get('name', '')}: {cat.get('items', '')}".strip(": ")
-        for cat in skills
-        if cat.get("name") or cat.get("items")
-    )
-
-
 def _find_soffice() -> str | None:
     for name in ("soffice", "libreoffice"):
         found = shutil.which(name)

@@ -9,7 +9,7 @@ API is FastAPI; no account or hosted service is required.
 - Dashboard, daily plan, pipeline metrics, and application tracker
 - LinkedIn search with configurable fit scoring and sponsorship checks
 - Paste-JD workflow for roles found anywhere
-- DOCX and PDF resume generation with built-in and uploaded templates
+- DOCX and PDF resume generation from an uploaded resume blueprint
 - Fully editable profile, scoring rules, resume content, and appearance
 - Optional Claude or OpenAI tailoring with source-evidence guardrails
 - First-run setup wizard and automatic offline fallback
@@ -54,7 +54,7 @@ run.py            cross-platform installer, diagnostics, and launcher
 backend/data/     live local configuration (created at runtime, git-ignored)
 ```
 
-See [README_V2.md](README_V2.md) for configuration, template tokens, AI behavior,
+See [README_V2.md](README_V2.md) for profile imports, configuration, AI behavior,
 and onboarding details. V1 remains available on the `master` branch.
 
 ## Release

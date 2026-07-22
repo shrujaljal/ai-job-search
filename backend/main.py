@@ -8,7 +8,7 @@ Phase 0: a runnable skeleton that
   • serves the built React app in production (frontend/dist), if present.
 
 Later phases add: /api/search, /api/tailor, /api/applications, /api/plan,
-/api/dashboard, /api/templates, and the LLM providers.
+/api/dashboard, profile imports, and the LLM providers.
 """
 
 from __future__ import annotations
@@ -16,24 +16,23 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-import shutil
 import tempfile
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field as PydanticField
 
 import re
 
 import config
+import profile_import
 import scoring
 import scrapers
 import store
 import resume_render
 import tailoring
-import templates as template_store
 from llm import ProviderError, create_provider
 
 app = FastAPI(title="Job Application Agent API", version="2.0.0")
@@ -74,6 +73,8 @@ def get_config(name: str) -> dict:
 def put_config(name: str, body: dict) -> dict:
     if name not in config.CONFIG_NAMES:
         raise HTTPException(404, f"Unknown config '{name}'")
+    if name == "profile":
+        body = profile_import.clean_profile(body)
     config.save(name, body)
     return {"saved": True, "name": name}
 
@@ -83,6 +84,71 @@ def reset_config(name: str) -> dict:
     if name not in config.CONFIG_NAMES:
         raise HTTPException(404, f"Unknown config '{name}'")
     return config.reset(name)
+
+
+# Profile sources
+MAX_PROFILE_FILES = 10
+MAX_PROFILE_FILE_BYTES = 10 * 1024 * 1024
+
+
+@app.post("/api/profile/import")
+async def import_profile(files: list[UploadFile] = File(...)) -> dict:
+    if not files or len(files) > MAX_PROFILE_FILES:
+        raise HTTPException(400, f"Upload between 1 and {MAX_PROFILE_FILES} files.")
+
+    parsed_documents = []
+    pending_sources: list[tuple[Path, str, dict]] = []
+    with tempfile.TemporaryDirectory(prefix="profile-import-") as temp_dir:
+        temp_root = Path(temp_dir)
+        for index, upload in enumerate(files):
+            original_name = Path(upload.filename or f"profile-{index + 1}.md").name
+            suffix = Path(original_name).suffix.lower()
+            if suffix not in profile_import.SUPPORTED_SUFFIXES:
+                raise HTTPException(400, f"{original_name}: use a DOCX, PDF, MD, or Markdown file.")
+            contents = await upload.read(MAX_PROFILE_FILE_BYTES + 1)
+            if len(contents) > MAX_PROFILE_FILE_BYTES:
+                raise HTTPException(400, f"{original_name}: file exceeds the 10 MB limit.")
+            path = temp_root / f"{index}{suffix}"
+            path.write_bytes(contents)
+            try:
+                parsed = profile_import.parse_resume(
+                    profile_import.extract_lines(path), original_name
+                )
+            except (ValueError, OSError) as exc:
+                raise HTTPException(400, f"Could not import {original_name}: {exc}") from exc
+            parsed_documents.append(parsed)
+            pending_sources.append((path, original_name, parsed))
+
+        for path, original_name, parsed in pending_sources:
+            stored_name = profile_import.save_source(path, original_name)
+            parsed["resume_blueprint"]["source_files"] = [stored_name]
+
+        profile, stats = profile_import.merge_profile(
+            config.load("profile"), parsed_documents
+        )
+        config.save("profile", profile)
+
+    settings = config.load("settings")
+    imported_name = profile.get("identity", {}).get("name", "")
+    if imported_name and settings.get("candidate_name", "") in {"", "Your Name"}:
+        settings["candidate_name"] = imported_name
+        config.save("settings", settings)
+
+    return {
+        "profile": profile,
+        "stats": stats,
+        "sources": profile.get("resume_blueprint", {}).get("source_files", []),
+    }
+
+
+@app.get("/api/profile/enrichment-prompt")
+def get_profile_enrichment_prompt() -> Response:
+    prompt = profile_import.enrichment_prompt(config.load("profile"))
+    return Response(
+        prompt,
+        media_type="text/markdown",
+        headers={"Content-Disposition": 'attachment; filename="profile-enrichment-prompts.md"'},
+    )
 
 
 @app.post("/api/llm/test")
@@ -230,75 +296,6 @@ def reset_onboarding() -> dict:
     return {"complete": False}
 
 
-# ── Resume templates ────────────────────────────────────────────────────────
-class ActiveTemplateRequest(BaseModel):
-    id: str
-
-
-@app.get("/api/templates")
-def list_templates() -> dict:
-    settings = config.load("settings")
-    active = settings.get("active_template", template_store.DEFAULT_TEMPLATE_ID)
-    return {
-        "active_template": active,
-        "required_tokens": sorted(template_store.REQUIRED_TOKENS),
-        "known_tokens": sorted(template_store.KNOWN_TOKENS),
-        "templates": template_store.list_templates(active),
-    }
-
-
-@app.post("/api/templates")
-def upload_template(file: UploadFile = File(...)) -> dict:
-    if not file.filename or not file.filename.lower().endswith(".docx"):
-        raise HTTPException(400, "Upload a .docx template.")
-
-    with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp:
-        tmp_path = Path(tmp.name)
-        shutil.copyfileobj(file.file, tmp)
-    try:
-        try:
-            item = template_store.save_upload(file.filename, tmp_path)
-        except Exception as e:
-            raise HTTPException(400, f"Template could not be read: {e}") from e
-        return item
-    finally:
-        tmp_path.unlink(missing_ok=True)
-
-
-@app.put("/api/templates/active")
-def set_active_template(req: ActiveTemplateRequest) -> dict:
-    template_id = req.id or template_store.DEFAULT_TEMPLATE_ID
-    if template_id != template_store.DEFAULT_TEMPLATE_ID:
-        path = template_store.resolve_template(template_id)
-        if not path or not path.exists():
-            raise HTTPException(404, "Template not found.")
-        info = template_store.validate_template(path)
-        if not info["valid"]:
-            missing = ", ".join(info["missing_tokens"])
-            raise HTTPException(400, f"Template is missing required tokens: {missing}")
-
-    settings = config.load("settings")
-    settings["active_template"] = template_id
-    config.save("settings", settings)
-    return {"active_template": template_id}
-
-
-@app.delete("/api/templates/{template_id}")
-def delete_template(template_id: str) -> dict:
-    try:
-        template_store.delete_template(template_id)
-    except ValueError as e:
-        raise HTTPException(400, str(e)) from e
-    except FileNotFoundError as e:
-        raise HTTPException(404, "Template not found.") from e
-
-    settings = config.load("settings")
-    if settings.get("active_template") == template_id:
-        settings["active_template"] = template_store.DEFAULT_TEMPLATE_ID
-        config.save("settings", settings)
-    return {"deleted": True}
-
-
 # ── Search (LinkedIn) → JD parse → config-driven scoring ─────────────────────
 class SearchRequest(BaseModel):
     roles: list[str]
@@ -419,8 +416,7 @@ def tailor(req: TailorRequest) -> dict:
     docx_path = out_dir / f"{role_name}.docx"
     pdf_path = out_dir / f"{_safe(candidate)}.pdf"
 
-    template_path = template_store.resolve_template(settings.get("active_template"))
-    resume_render.render_docx(ctx, str(docx_path), template_path=template_path)
+    resume_render.render_docx(ctx, str(docx_path))
     pdf_error = ""
     try:
         resume_render.docx_to_pdf(docx_path, pdf_path)

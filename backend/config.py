@@ -30,7 +30,7 @@ CONFIG_NAMES = ("profile", "rules", "resume_content", "settings")
 def ensure_config() -> None:
     """Create data/ and copy any missing config file from defaults/."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    (DATA_DIR / "templates").mkdir(exist_ok=True)   # user-uploaded résumé templates
+    (DATA_DIR / "profile_sources").mkdir(exist_ok=True)
     (DATA_DIR / "output").mkdir(exist_ok=True)      # tracker, daily plan, etc.
     for name in CONFIG_NAMES:
         target = DATA_DIR / f"{name}.json"

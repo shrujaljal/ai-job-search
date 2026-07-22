@@ -105,7 +105,7 @@ export function Onboarding({ status }: { status: OnboardingStatus }) {
                     <input autoFocus className={inputCls} value={draft.output_dir} onChange={(e) => set('output_dir', e.target.value)} placeholder="Leave blank for ~/JobApplications" />
                   </Field>
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
-                    Files are organized into company and role folders. The built-in résumé template is active; custom DOCX templates can be uploaded later in Settings.
+                    Files are organized into company and role folders. Upload a master resume in Settings -&gt; Profile to set its section order and headings.
                   </div>
                 </div>
               )}

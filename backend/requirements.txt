@@ -3,8 +3,9 @@ fastapi>=0.115
 uvicorn[standard]>=0.30
 pydantic>=2.7
 python-docx>=1.1
+pypdf>=5.0
 httpx>=0.27
-python-multipart>=0.0.9   # file uploads (custom résumé templates)
+python-multipart>=0.0.9   # profile source uploads
 
 # LLM providers (used only when AI tailoring is enabled)
 anthropic>=0.40

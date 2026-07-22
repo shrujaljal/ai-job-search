@@ -1,5 +1,9 @@
 # Job Application Agent — V2.0 Plan
 
+> Historical roadmap note: the post-2.0 profile-source flow supersedes the
+> separate custom-template manager described below. Current behavior is documented
+> in README_V2.md.
+
 **Goal:** turn the personal V1 tool into a configurable product for a general
 audience — a local, single-user app where **every part of the profile, the selection
 rules, and the résumé content is editable through a proper Settings UI**, with

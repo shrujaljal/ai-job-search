@@ -3,8 +3,8 @@ Config-driven résumé assembly.
 
 Turns the user's facts (`profile.json`) plus per-family tailoring
 (`resume_content.json`) into a normalized render context for a detected role
-family, applying one-page content limits. The context is template-agnostic —
-it feeds the DOCX renderer (default template or a user-uploaded one).
+family, applying one-page content limits. The context feeds the DOCX renderer,
+which follows the profile-owned section blueprint.
 
 This replaces V1's hardcoded `resume_engine/profile.py`: nothing here is
 specific to any person; everything comes from config.
@@ -48,8 +48,7 @@ def build_context(profile: dict, content: dict, family: str) -> dict:
     """
     Assemble a tailored, one-page render context.
 
-    Returns a dict with: identity, summary, coursework, experiences, education,
-    projects, leadership, skills, family, warnings.
+    Returns a dict with profile content plus its resume blueprint and warnings.
     """
     limits = {**DEFAULT_LIMITS, **content.get("limits", {})}
     fam = _family_cfg(content, family)
@@ -97,6 +96,8 @@ def build_context(profile: dict, content: dict, family: str) -> dict:
         chosen = [p for p in all_projects if p.get("title") in wanted_titles]
     else:
         chosen = [p for p in all_projects if family in p.get("families", [])]
+        if not chosen:
+            chosen = all_projects
     chosen = chosen[: limits["max_projects"]]
     projects = [{
         "title": p.get("title", ""),
@@ -131,6 +132,9 @@ def build_context(profile: dict, content: dict, family: str) -> dict:
         "education": education,
         "projects": projects,
         "leadership": leadership,
+        "honors": profile.get("honors", []),
+        "custom_sections": profile.get("custom_sections", []),
+        "resume_blueprint": profile.get("resume_blueprint", {}),
         "skills": skills,
         "family": family,
         "warnings": warnings,

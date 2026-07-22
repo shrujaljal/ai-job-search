@@ -26,7 +26,6 @@ export interface Settings {
   output_dir: string
   theme: string
   accent: string
-  active_template: string
   llm: {
     enabled: boolean
     provider: string
@@ -36,25 +35,6 @@ export interface Settings {
   }
   search: { boards: string[]; pages_per_board: number }
   [k: string]: unknown
-}
-
-export interface ResumeTemplate {
-  id: string
-  name: string
-  builtin: boolean
-  active: boolean
-  valid: boolean
-  recognized_tokens: string[]
-  missing_tokens: string[]
-  unknown_tokens: string[]
-  size: number
-}
-
-export interface TemplatesResponse {
-  active_template: string
-  required_tokens: string[]
-  known_tokens: string[]
-  templates: ResumeTemplate[]
 }
 
 export interface OnboardingStatus {
@@ -80,6 +60,17 @@ export interface OnboardingPayload {
   ai_api_key: string
 }
 
+export interface ProfileImportResult {
+  profile: Record<string, unknown>
+  stats: {
+    files: number
+    items_added: number
+    duplicates_removed: number
+    sections_added: number
+  }
+  sources: string[]
+}
+
 export const api = {
   health: () => req<Health>('/health'),
   getSettings: () => req<Settings>('/config/settings'),
@@ -93,22 +84,18 @@ export const api = {
   resetConfig: <T = Record<string, unknown>>(name: string) => req<T>(`/config/${name}/reset`, 'POST'),
   testLlm: () => req<{ ok: boolean; provider: string; model: string }>('/llm/test', 'POST'),
 
-  listTemplates: () => req<TemplatesResponse>('/templates'),
-  uploadTemplate: async (file: File) => {
+  importProfile: async (files: File[]) => {
     const body = new FormData()
-    body.append('file', file)
-    const res = await fetch('/api/templates', { method: 'POST', body })
+    files.forEach((file) => body.append('files', file))
+    const res = await fetch('/api/profile/import', { method: 'POST', body })
     if (!res.ok) {
       let detail = res.statusText
       try { detail = (await res.json()).detail ?? detail } catch { /* ignore */ }
       throw new Error(detail)
     }
-    return res.json() as Promise<ResumeTemplate>
+    return res.json() as Promise<ProfileImportResult>
   },
-  setActiveTemplate: (id: string) =>
-    req<{ active_template: string }>('/templates/active', 'PUT', { id }),
-  deleteTemplate: (id: string) =>
-    req<{ deleted: boolean }>(`/templates/${encodeURIComponent(id)}`, 'DELETE'),
+  profileEnrichmentPromptUrl: '/api/profile/enrichment-prompt',
 
   search: (payload: {
     roles: string[]; location: string; date_posted: string

@@ -26,7 +26,23 @@
   "leadership": [
     { "organization": "", "role": "", "bullets": [""] }
   ],
+  "honors": [],
   "skills": [
     { "name": "", "items": "" }
-  ]
+  ],
+  "custom_sections": [],
+  "resume_blueprint": {
+    "source_files": [],
+    "section_order": ["summary", "experience", "education", "projects_leadership", "skills"],
+    "section_headings": {
+      "summary": "Professional Summary",
+      "experience": "Experience",
+      "education": "Education",
+      "projects": "Projects",
+      "leadership": "Leadership",
+      "projects_leadership": "Projects & Leadership",
+      "skills": "Skills",
+      "honors": "Honors & Awards"
+    }
+  }
 }

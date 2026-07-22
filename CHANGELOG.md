@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Replaced the separate template settings screen with multi-file profile imports.
+- Added resume blueprint section ordering/headings, unique bullet merging, custom
+  sections, and downloadable experience-enrichment prompts.
+
 ## 2.0.0 - 2026-07-20
 
 - Rebuilt the application as a React and FastAPI local product.
