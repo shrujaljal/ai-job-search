@@ -2,6 +2,7 @@ import { lazy, Suspense, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'motion/react'
 import { api, type Health } from './api'
+import { AccountSwitcher } from './components/AccountSwitcher'
 import { ThemeControls } from './components/ThemeControls'
 import { Onboarding } from './components/Onboarding'
 import { ErrorState, PageLoading } from './components/ui'
@@ -9,6 +10,7 @@ import { ErrorState, PageLoading } from './components/ui'
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Tracker = lazy(() => import('./pages/Tracker'))
 const Search = lazy(() => import('./pages/Search'))
+const TargetCompanies = lazy(() => import('./pages/TargetCompanies'))
 const PasteJD = lazy(() => import('./pages/PasteJD'))
 const Settings = lazy(() => import('./pages/Settings'))
 
@@ -18,6 +20,7 @@ const TABS = [
   { key: 'dashboard', label: 'Dashboard', icon: '📊', el: <Dashboard /> },
   { key: 'tracker', label: 'Tracker', icon: '🗂️', el: <Tracker /> },
   { key: 'search', label: 'Search & Tailor', icon: '🔍', el: <Search /> },
+  { key: 'companies', label: 'Target Companies', icon: '🏢', el: <TargetCompanies /> },
   { key: 'paste', label: 'Paste JD', icon: '📝', el: <PasteJD /> },
 ]
 
@@ -75,9 +78,10 @@ export default function App() {
           </div>
           <span className="hidden text-sm text-slate-400 sm:inline">·</span>
           <span className="hidden text-sm text-slate-500 sm:inline dark:text-slate-400">Hi, <b className="text-slate-700 dark:text-slate-200">{username}</b> 👋</span>
-          <div className="ml-auto flex items-center gap-3">
-            <StreakPill />
-            <ThemeControls />
+          <div className="ml-auto flex items-center gap-2 sm:gap-3">
+            <AccountSwitcher />
+            <div className="hidden sm:block"><StreakPill /></div>
+            <div className="hidden sm:block"><ThemeControls /></div>
             <button onClick={() => setPage('settings')} title="Settings"
               className={`themed flex h-9 w-9 items-center justify-center rounded-xl border text-base transition ${
                 page === 'settings'
@@ -87,7 +91,7 @@ export default function App() {
               style={page === 'settings' ? { background: 'linear-gradient(135deg, var(--accent), var(--accent-2))' } : undefined}>
               ⚙️
             </button>
-            <ConnectionDot />
+            <span className="hidden sm:inline"><ConnectionDot /></span>
           </div>
         </div>
 

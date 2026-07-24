@@ -3,6 +3,7 @@
 
 import type {
   SearchResponse, TailorResult, Application, Dashboard, Plan,
+  AccountsResponse, CompanySource, TargetCompanyResponse,
 } from './types'
 
 async function req<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
@@ -109,6 +110,16 @@ export const api = {
     roles: string[]; location: string; date_posted: string
     job_type: string; pages: number
   }) => req<SearchResponse>('/search', 'POST', payload),
+
+  searchTargetCompanies: (payload: {
+    sites: CompanySource[]; recent_days: number; minimum_fit_score: number
+  }) => req<TargetCompanyResponse>('/target-company-jobs/search', 'POST', payload),
+
+  getAccounts: () => req<AccountsResponse>('/accounts'),
+  createAccount: (name: string) =>
+    req<{ active_id: string }>('/accounts', 'POST', { name }),
+  activateAccount: (accountId: string) =>
+    req<{ active_id: string }>('/accounts/active', 'PUT', { account_id: accountId }),
 
   tailor: (payload: {
     company: string; role: string; jd_text?: string; job_id?: string

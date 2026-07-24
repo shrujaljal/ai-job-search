@@ -5,11 +5,15 @@ import { Card, Button, EmptyState, Field, inputCls, ScoreBar, TierBadge, Spinner
 import { ResultCard } from '../components/ResultCard'
 import type { Job, SearchResponse, TailorResult } from '../types'
 
-function RolesInput({ roles, setRoles }: { roles: string[]; setRoles: (r: string[]) => void }) {
-  const [text, setText] = useState('')
+function RolesInput({ roles, setRoles, text, setText }: {
+  roles: string[]
+  setRoles: (r: string[]) => void
+  text: string
+  setText: (value: string) => void
+}) {
   const add = () => {
     const v = text.trim()
-    if (v && !roles.includes(v)) setRoles([...roles, v])
+    if (v && !roles.some((role) => role.toLowerCase() === v.toLowerCase())) setRoles([...roles, v])
     setText('')
   }
   return (
@@ -24,13 +28,14 @@ function RolesInput({ roles, setRoles }: { roles: string[]; setRoles: (r: string
       </div>
       <input className={`${inputCls} mt-2`} value={text} onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add() } }}
-        placeholder="Type a role and press Enter (e.g. Operations Analyst)" />
+        placeholder="e.g. Operations Analyst" />
     </div>
   )
 }
 
 export default function Search() {
   const [roles, setRoles] = useState<string[]>([])
+  const [roleText, setRoleText] = useState('')
   const [location, setLocation] = useState('')
   const [datePosted, setDatePosted] = useState('any')
   const [jobType, setJobType] = useState('any')
@@ -41,10 +46,19 @@ export default function Search() {
   const settings = useQuery({ queryKey: ['settings'], queryFn: api.getSettings, retry: false })
   const usingAi = Boolean(settings.data?.llm.enabled)
 
-  const search = useMutation<SearchResponse, Error>({
-    mutationFn: () => api.search({ roles, location, date_posted: datePosted, job_type: jobType, pages }),
+  const search = useMutation<SearchResponse, Error, string[]>({
+    mutationFn: (searchRoles) => api.search({ roles: searchRoles, location, date_posted: datePosted, job_type: jobType, pages }),
     onSuccess: () => { setQueued(new Set()); setTailorResults([]) },
   })
+  const pendingRole = roleText.trim()
+  const searchRoles = pendingRole && !roles.some((role) => role.toLowerCase() === pendingRole.toLowerCase())
+    ? [...roles, pendingRole] : roles
+  const runSearch = () => {
+    if (searchRoles.length === 0) return
+    setRoles(searchRoles)
+    setRoleText('')
+    search.mutate(searchRoles)
+  }
 
   const jobs = search.data?.jobs ?? []
   const visible = jobs.filter((j) => !(hideBlocked && j.blocked))
@@ -70,7 +84,7 @@ export default function Search() {
       <h1 className="text-2xl font-semibold">Search & Tailor</h1>
 
       <Card className="space-y-4">
-        <Field label="Roles"><RolesInput roles={roles} setRoles={setRoles} /></Field>
+        <Field label="Roles"><RolesInput roles={roles} setRoles={setRoles} text={roleText} setText={setRoleText} /></Field>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
           <Field label="Location"><input className={inputCls} value={location} onChange={(e) => setLocation(e.target.value)} placeholder="California" /></Field>
           <Field label="Date posted">
@@ -88,7 +102,7 @@ export default function Search() {
           <Field label="Pages"><input type="number" min={1} max={5} className={inputCls} value={pages} onChange={(e) => setPages(Number(e.target.value))} /></Field>
         </div>
         <div className="flex items-center gap-3">
-          <Button disabled={roles.length === 0 || search.isPending} onClick={() => search.mutate()}>Search Jobs</Button>
+          <Button disabled={searchRoles.length === 0 || search.isPending} onClick={runSearch}>Search Jobs</Button>
           {search.isPending && <Spinner label="Scraping, reading JDs, and scoring…" />}
         </div>
         {search.isError && <p className="text-sm text-red-600">{search.error.message}</p>}

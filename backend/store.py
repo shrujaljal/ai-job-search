@@ -11,14 +11,26 @@ import json
 from datetime import date, timedelta
 from pathlib import Path
 
-DATA = Path(__file__).resolve().parent / "data"
-OUTPUT = DATA / "output"
-TRACKER = OUTPUT / "tracker.json"
-PLAN = OUTPUT / "daily_plan.json"
-STREAK = OUTPUT / "streak.json"
+import config
 
 STATUSES = ["To Apply", "Applied", "Phone Screen", "Interview",
             "Final Round", "Offer", "Rejected"]
+
+
+def _output() -> Path:
+    return config.DATA_DIR / "output"
+
+
+def _tracker() -> Path:
+    return _output() / "tracker.json"
+
+
+def _plan() -> Path:
+    return _output() / "daily_plan.json"
+
+
+def _streak() -> Path:
+    return _output() / "streak.json"
 
 
 def _read(path: Path, fallback):
@@ -39,7 +51,7 @@ def _write(path: Path, data) -> None:
 
 # ── Tracker ───────────────────────────────────────────────────────────────────
 def list_applications() -> list[dict]:
-    return _read(TRACKER, [])
+    return _read(_tracker(), [])
 
 
 def _next_id(rows: list[dict]) -> int:
@@ -62,7 +74,7 @@ def add_application(company: str, role: str, location: str = "", url: str = "",
            "location": location, "url": url, "date_added": str(date.today()),
            "status": status, "notes": notes}
     rows.append(row)
-    _write(TRACKER, rows)
+    _write(_tracker(), rows)
     return row
 
 
@@ -73,7 +85,7 @@ def update_application(app_id: int, fields: dict) -> bool:
             for k in ("status", "notes", "location", "url"):
                 if k in fields:
                     r[k] = fields[k]
-            _write(TRACKER, rows)
+            _write(_tracker(), rows)
             return True
     return False
 
@@ -83,17 +95,17 @@ def delete_application(app_id: int) -> bool:
     new = [r for r in rows if r.get("id") != app_id]
     if len(new) == len(rows):
         return False
-    _write(TRACKER, new)
+    _write(_tracker(), new)
     return True
 
 
 # ── Daily plan ────────────────────────────────────────────────────────────────
 def get_plan() -> dict:
-    return _read(PLAN, {})
+    return _read(_plan(), {})
 
 
 def save_plan(data: dict) -> None:
-    _write(PLAN, data)
+    _write(_plan(), data)
     # Completing today's plan counts toward the daily streak.
     if data.get("done") and data.get("date"):
         record_activity(data["date"])
@@ -101,7 +113,7 @@ def save_plan(data: dict) -> None:
 
 # ── Streak ────────────────────────────────────────────────────────────────────
 def get_streak() -> dict:
-    return _read(STREAK, {"current": 0, "longest": 0, "last_date": ""})
+    return _read(_streak(), {"current": 0, "longest": 0, "last_date": ""})
 
 
 def record_activity(today: str) -> dict:
@@ -117,7 +129,7 @@ def record_activity(today: str) -> dict:
     s["current"] = s.get("current", 0) + 1 if last == yesterday else 1
     s["last_date"] = today
     s["longest"] = max(s.get("longest", 0), s["current"])
-    _write(STREAK, s)
+    _write(_streak(), s)
     return s
 
 

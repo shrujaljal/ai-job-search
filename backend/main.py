@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field as PydanticField
 import re
 
 import config
+import company_jobs
 import profile_import
 import scoring
 import scrapers
@@ -54,13 +55,55 @@ app.add_middleware(
 
 @app.on_event("startup")
 def _startup() -> None:
-    config.ensure_config()
+    config.initialize_accounts()
 
 
 # ── Health ───────────────────────────────────────────────────────────────────
 @app.get("/api/health")
 def health() -> dict:
     return {"status": "ok", "version": app.version}
+
+
+# Accounts are isolated local job profiles, not remote authentication users.
+class AccountCreate(BaseModel):
+    name: str
+
+
+class AccountActivate(BaseModel):
+    account_id: str
+
+
+@app.get("/api/accounts")
+def get_accounts() -> dict:
+    return config.accounts()
+
+
+@app.post("/api/accounts")
+def post_account(req: AccountCreate) -> dict:
+    try:
+        account = config.create_account(req.name)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {"account": account, "active_id": account["id"]}
+
+
+@app.put("/api/accounts/active")
+def put_active_account(req: AccountActivate) -> dict:
+    try:
+        account = config.activate_account(req.account_id)
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return {"account": account, "active_id": account["id"]}
+
+
+@app.patch("/api/accounts/{account_id}")
+def patch_account(account_id: str, req: AccountCreate) -> dict:
+    try:
+        return config.rename_account(account_id, req.name)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except KeyError as exc:
+        raise HTTPException(404, str(exc)) from exc
 
 
 # ── Config read / write / reset ──────────────────────────────────────────────
@@ -386,6 +429,91 @@ def search(req: SearchRequest) -> dict:
     }
 
 
+# ── Target-company career search ─────────────────────────────────────────────
+class CompanySource(BaseModel):
+    name: str
+    url: str
+    enabled: bool = True
+
+
+class TargetCompanySearchRequest(BaseModel):
+    sites: list[CompanySource]
+    recent_days: int = PydanticField(default=14, ge=1, le=90)
+    minimum_fit_score: int = PydanticField(default=0, ge=0, le=100)
+
+
+@app.post("/api/target-company-jobs/search")
+def search_target_company_jobs(req: TargetCompanySearchRequest) -> dict:
+    sources = [source.model_dump() for source in req.sites if source.enabled]
+    if not sources:
+        raise HTTPException(400, "Add at least one enabled company career site.")
+
+    config.save("target_companies", {
+        "sites": [source.model_dump() for source in req.sites],
+        "recent_days": req.recent_days,
+        "minimum_fit_score": req.minimum_fit_score,
+    })
+    jobs: list[dict] = []
+    errors: list[dict] = []
+    with ThreadPoolExecutor(max_workers=min(6, len(sources))) as executor:
+        futures = {executor.submit(company_jobs.fetch_source, source): source for source in sources}
+        for future in as_completed(futures):
+            source = futures[future]
+            try:
+                jobs.extend(company_jobs.filter_recent(future.result(), req.recent_days))
+            except Exception as exc:
+                errors.append({"name": source["name"], "message": str(exc)})
+
+    rules = config.load("rules")
+    seen: set[tuple[str, str, str]] = set()
+    unique: list[dict] = []
+    for job in jobs:
+        if not job.get("title"):
+            continue
+        key = (
+            company_jobs.normalize_url(job.get("url", "")),
+            job.get("company", "").lower().strip(),
+            job.get("title", "").lower().strip(),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        fit = scoring.score_job(
+            job.get("title", ""), job.get("company", ""),
+            job.get("location", ""), job.get("jd_text", ""), rules,
+        )
+        job.update({name: fit[name] for name in
+                    ("score", "tier", "family", "reason", "blocked", "scored_on_jd")})
+        if job["score"] >= req.minimum_fit_score:
+            unique.append(job)
+
+    company_jobs.annotate_tracker(unique, store.list_applications())
+
+    def _posted_timestamp(job: dict) -> float:
+        try:
+            return datetime.fromisoformat(
+                job.get("posted_at", "").replace("Z", "+00:00")
+            ).timestamp()
+        except (ValueError, AttributeError):
+            return 0
+
+    unique.sort(key=lambda job: (
+        bool(job.get("already_applied")),
+        -job.get("score", 0),
+        -_posted_timestamp(job),
+    ))
+    return {
+        "jobs": unique,
+        "errors": errors,
+        "counts": {
+            "total": len(unique),
+            "applied": sum(1 for job in unique if job.get("already_applied")),
+            "tracked": sum(1 for job in unique if job.get("tracked")),
+            "sources": len(sources),
+        },
+    }
+
+
 # ── Tailor a résumé (from a job or pasted JD) ────────────────────────────────
 _INVALID = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
@@ -399,7 +527,11 @@ def _safe(name: str, maxlen: int = 120) -> str:
 def _output_root() -> Path:
     settings = config.load("settings")
     custom = (settings.get("output_dir") or "").strip()
-    return Path(custom) if custom else (Path.home() / "JobApplications")
+    if custom:
+        return Path(custom)
+    root = Path.home() / "JobApplications"
+    account_id = config.active_account_id()
+    return root if account_id == "default" else root / account_id
 
 
 class TailorRequest(BaseModel):

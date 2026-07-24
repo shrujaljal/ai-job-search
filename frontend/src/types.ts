@@ -21,6 +21,39 @@ export interface SearchResponse {
   counts: { total: number; scored_on_jd: number; blocked: number }
 }
 
+export interface CompanySource {
+  name: string
+  url: string
+  enabled: boolean
+}
+
+export interface TargetCompanyJob extends Job {
+  posted_at: string
+  source: string
+  recent: boolean | null
+  tracked: boolean
+  already_applied: boolean
+  application_id?: number
+  application_status: string
+}
+
+export interface TargetCompanyResponse {
+  jobs: TargetCompanyJob[]
+  errors: { name: string; message: string }[]
+  counts: { total: number; applied: number; tracked: number; sources: number }
+}
+
+export interface Account {
+  id: string
+  name: string
+  created_at: string
+}
+
+export interface AccountsResponse {
+  active_id: string
+  accounts: Account[]
+}
+
 export interface TailorResult {
   ok: boolean
   blocked: boolean
