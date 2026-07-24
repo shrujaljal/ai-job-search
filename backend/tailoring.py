@@ -6,7 +6,7 @@ from copy import deepcopy
 
 import resume_builder
 from llm import LLMProvider, ProviderError, create_provider
-from llm.prompts import SYSTEM_PROMPT, build_user_prompt
+from llm.prompts import build_grounding_sources, build_system_prompt, build_user_prompt
 
 
 NUMBER_RE = re.compile(r"(?<!\w)\d+(?:\.\d+)?%?\+?")
@@ -37,12 +37,18 @@ def build_tailored_context(
 
     try:
         active_provider = provider or create_provider(llm_settings)
+        strictness = max(0, min(100, int(llm_settings.get("grounding_strictness", 85))))
+        grounding_sources = build_grounding_sources(profile, base, jd_text)
         raw = active_provider.complete_json(
-            SYSTEM_PROMPT,
-            build_user_prompt(profile, base, jd_text, role, company),
+            build_system_prompt(strictness),
+            build_user_prompt(
+                profile, base, jd_text, role, company, strictness, grounding_sources
+            ),
         )
         proposal = parse_provider_json(raw)
-        tailored = _apply_validated(base, profile, proposal, content)
+        tailored = _apply_validated(
+            base, profile, proposal, content, grounding_sources, strictness
+        )
         return tailored, {
             "engine": "ai",
             "ai_requested": True,
@@ -73,7 +79,14 @@ def parse_provider_json(raw: str) -> dict:
     return value
 
 
-def _apply_validated(base: dict, profile: dict, proposal: dict, content: dict) -> dict:
+def _apply_validated(
+    base: dict,
+    profile: dict,
+    proposal: dict,
+    content: dict,
+    grounding_sources: list[dict] | None = None,
+    strictness: int = 85,
+) -> dict:
     result = deepcopy(base)
     limits = {**resume_builder.DEFAULT_LIMITS, **content.get("limits", {})}
 
@@ -91,7 +104,16 @@ def _apply_validated(base: dict, profile: dict, proposal: dict, content: dict) -
     _validate_numbers(summary, " ".join(summary_evidence), "summary")
     result["summary"] = summary.strip()
 
-    source_experiences = base.get("experiences", [])
+    source_experiences = grounding_sources or [
+        {
+            **exp,
+            "bullets": [
+                {"index": index, "text": text}
+                for index, text in enumerate(exp.get("bullets", []))
+            ],
+        }
+        for exp in base.get("experiences", [])
+    ]
     proposed_experiences = proposal.get("experiences", [])
     if not isinstance(proposed_experiences, list):
         raise TailoringValidationError("AI experiences must be a list.")
@@ -103,7 +125,10 @@ def _apply_validated(base: dict, profile: dict, proposal: dict, content: dict) -
         if exp_index in seen_experiences:
             raise TailoringValidationError("AI returned a duplicate experience.")
         seen_experiences.add(exp_index)
-        source_bullets = source_experiences[exp_index].get("bullets", [])
+        source_bullets = [
+            item.get("text", "") if isinstance(item, dict) else str(item)
+            for item in source_experiences[exp_index].get("bullets", [])
+        ]
         proposed_bullets = exp.get("bullets", [])
         if not isinstance(proposed_bullets, list):
             raise TailoringValidationError("AI bullets must be a list.")
@@ -118,6 +143,7 @@ def _apply_validated(base: dict, profile: dict, proposal: dict, content: dict) -
                 raise TailoringValidationError("AI bullet has invalid source evidence.")
             evidence = " ".join(source_bullets[i] for i in indices)
             _validate_numbers(text, evidence, "experience bullet")
+            _validate_rewrite_distance(text, evidence, strictness)
             validated_bullets.append(text.strip())
         if validated_bullets:
             result["experiences"][exp_index]["bullets"] = validated_bullets
@@ -136,6 +162,28 @@ def _validate_numbers(output: str, evidence: str, label: str) -> None:
     if invented:
         raise TailoringValidationError(
             f"AI introduced unsupported numbers in {label}: {', '.join(invented)}")
+
+
+def _validate_rewrite_distance(output: str, evidence: str, strictness: int) -> None:
+    if strictness < 50:
+        return
+    output_tokens = _meaningful_tokens(output)
+    evidence_tokens = _meaningful_tokens(evidence)
+    if not output_tokens:
+        raise TailoringValidationError("AI returned an unusable experience bullet.")
+    overlap = len(output_tokens & evidence_tokens) / len(output_tokens)
+    minimum = 0.38 if strictness >= 80 else 0.20
+    if overlap < minimum:
+        raise TailoringValidationError(
+            "AI wording deviated beyond the configured Profile grounding level."
+        )
+
+
+def _meaningful_tokens(value: str) -> set[str]:
+    return {
+        token for token in re.findall(r"[a-z0-9+#.]+", value.lower())
+        if len(token) > 2
+    }
 
 
 def _select_skills(categories: list[dict], selected: list[str]) -> list[dict]:

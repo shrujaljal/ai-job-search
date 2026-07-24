@@ -117,14 +117,31 @@ export function Onboarding({ status }: { status: OnboardingStatus }) {
                   {draft.ai_enabled && (
                     <div className="grid gap-4 sm:grid-cols-2">
                       <Field label="Provider"><select className={inputCls} value={draft.ai_provider} onChange={(e) => {
-                        const provider = e.target.value as 'claude' | 'openai'
-                        setDraft((current) => ({ ...current, ai_provider: provider, ai_model: provider === 'claude' ? 'claude-sonnet-5' : 'gpt-4o' }))
-                      }}><option value="claude">Anthropic (Claude)</option><option value="openai">OpenAI</option></select></Field>
+                        const provider = e.target.value
+                        const models: Record<string, string> = {
+                          openrouter: 'openrouter/free',
+                          groq: 'openai/gpt-oss-20b',
+                          ollama: 'gpt-oss:20b',
+                          openai: 'gpt-4o',
+                          claude: 'claude-sonnet-5',
+                        }
+                        setDraft((current) => ({ ...current, ai_provider: provider, ai_model: models[provider] }))
+                      }}>
+                        <optgroup label="Free options">
+                          <option value="openrouter">OpenRouter Free</option>
+                          <option value="groq">Groq Free Tier</option>
+                          <option value="ollama">Ollama Local</option>
+                        </optgroup>
+                        <optgroup label="Paid options">
+                          <option value="openai">OpenAI</option>
+                          <option value="claude">Anthropic Claude</option>
+                        </optgroup>
+                      </select></Field>
                       <Field label="Model"><input className={inputCls} value={draft.ai_model} onChange={(e) => set('ai_model', e.target.value)} /></Field>
-                      <div className="sm:col-span-2"><Field label="API key"><input type="password" className={inputCls} value={draft.ai_api_key} onChange={(e) => set('ai_api_key', e.target.value)} placeholder="Stored only on this computer" /></Field></div>
+                      {draft.ai_provider !== 'ollama' && <div className="sm:col-span-2"><Field label="API key"><input type="password" className={inputCls} value={draft.ai_api_key} onChange={(e) => set('ai_api_key', e.target.value)} placeholder="Stored only on this computer" /></Field></div>}
                     </div>
                   )}
-                  {!draft.ai_enabled && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600 dark:bg-slate-950 dark:text-slate-300">You can enable Claude or OpenAI later under Settings. Search, scoring, and résumé generation work without an API key.</p>}
+                  {!draft.ai_enabled && <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600 dark:bg-slate-950 dark:text-slate-300">You can enable a free hosted tier, local Ollama, or a paid provider later under Settings. Search, scoring, and resume generation work without an API key.</p>}
                   {complete.isError && <p className="text-sm text-rose-600">{complete.error.message}</p>}
                 </div>
               )}

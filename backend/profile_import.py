@@ -31,20 +31,27 @@ DEFAULT_HEADINGS = {
 }
 SECTION_ALIASES = {
     "summary": {"summary", "professional summary", "profile", "professional profile", "about", "objective", "career objective"},
-    "experience": {"experience", "professional experience", "work experience", "employment", "employment history", "career history"},
+    "experience": {
+        "experience", "professional experience", "work experience", "employment",
+        "employment history", "career history", "research", "research experience",
+        "teaching", "teaching experience",
+    },
     "education": {"education", "academic background", "academic experience", "qualifications"},
     "skills": {"skills", "technical skills", "core skills", "core competencies", "competencies", "tools", "technologies"},
     "projects": {"projects", "selected projects", "academic projects", "professional projects"},
     "leadership": {"leadership", "leadership experience", "activities", "volunteer experience", "volunteering", "community involvement"},
     "projects_leadership": {"projects and leadership", "projects leadership", "projects & leadership"},
     "honors": {"honors", "awards", "honors and awards", "honors & awards", "achievements", "awards and recognition"},
+    "ignore": {"next steps", "instructions", "document purpose"},
 }
 EMAIL_RE = re.compile(r"[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}", re.I)
 URL_RE = re.compile(r"(?:https?://|www\.|linkedin\.com/)\S+", re.I)
 PHONE_RE = re.compile(r"(?<!\d)(?:\+?\d[\d().\s-]{7,}\d)")
 DATE_RE = re.compile(r"\b(?:19|20)\d{2}\b|\bpresent\b|\bcurrent\b", re.I)
 ROLE_RE = re.compile(r"\b(analyst|manager|director|lead|intern|consultant|associate|specialist|coordinator|assistant|engineer|officer|advisor|representative|founder|president)\b", re.I)
-BULLET_RE = re.compile(r"^\s*(?:[-*\u2022\u25aa\u25e6\u2023]|\d+[.)])\s+")
+BULLET_RE = re.compile(r"^\s*(?:[-*\u2022\u25aa\u25e6\u2023\ufffd]|\d+[.)])\s+")
+ENTRY_MARKER = "\x1eentry:"
+SUBHEADING_MARKER = "\x1esub:"
 
 
 @dataclass
@@ -114,29 +121,93 @@ def _pdf_lines(path: Path) -> list[Line]:
         raise ValueError("PDF import requires pypdf. Run python run.py --install.") from exc
     try:
         reader = PdfReader(str(path))
-        result = []
+        extracted = []
         for page in reader.pages:
             for raw in (page.extract_text() or "").splitlines():
-                text = raw.strip()
+                text = raw.strip().replace("\ufffd", "-")
                 if text:
-                    result.append(Line(text, _looks_like_heading(text)))
+                    extracted.append(Line(text, _looks_like_heading(text)))
+        result = _coalesce_pdf_bullets(extracted)
     except (PyPdfError, OSError, ValueError) as exc:
         raise ValueError("The PDF is damaged, encrypted, or has no readable structure.") from exc
     return result
 
 
 def _markdown_lines(path: Path) -> list[Line]:
-    result = []
+    result: list[Line] = []
+    pending_bullet = ""
+
+    def flush_bullet() -> None:
+        nonlocal pending_bullet
+        if pending_bullet:
+            result.append(Line(f"- {_clean_markdown(pending_bullet)}"))
+            pending_bullet = ""
+
     for raw in path.read_text(encoding="utf-8-sig", errors="replace").splitlines():
         text = raw.strip()
         if not text:
+            flush_bullet()
+            continue
+        if re.fullmatch(r"[-*_]{3,}", text):
+            flush_bullet()
             continue
         match = re.match(r"^(#{1,6})\s+(.+)$", text)
         if match:
-            result.append(Line(match.group(2).strip(), True, len(match.group(1))))
-        else:
-            result.append(Line(text, False, 0))
+            flush_bullet()
+            result.append(Line(_clean_markdown(match.group(2)), True, len(match.group(1))))
+            continue
+        bullet = BULLET_RE.match(text)
+        if bullet:
+            flush_bullet()
+            pending_bullet = BULLET_RE.sub("", text)
+            continue
+        if pending_bullet and (raw[:1].isspace() or not _looks_like_markdown_metadata(text)):
+            pending_bullet = f"{pending_bullet.rstrip(' \\\\')} {text}"
+            continue
+        flush_bullet()
+        clean = _clean_markdown(text)
+        if clean and not text.startswith(">"):
+            result.append(Line(clean, False, 0))
+    flush_bullet()
     return result
+
+
+def _clean_markdown(text: str) -> str:
+    clean = text.strip().lstrip(">").strip().rstrip("\\").strip()
+    clean = re.sub(r"(\*\*|__|`)", "", clean)
+    clean = re.sub(r"(?<=[A-Za-z])\s+-\s+(?=[a-z])", "-", clean)
+    return re.sub(r"\s+", " ", clean).strip()
+
+
+def _looks_like_markdown_metadata(text: str) -> bool:
+    return bool(
+        re.match(r"^(?:\*\*|__)", text)
+        or DATE_RE.search(text)
+        or re.match(r"^[A-Za-z][^:]{0,35}:", text)
+    )
+
+
+def _coalesce_pdf_bullets(lines: list[Line]) -> list[Line]:
+    result: list[Line] = []
+    for line in lines:
+        if (
+            result
+            and BULLET_RE.match(result[-1].text)
+            and not line.heading
+            and not BULLET_RE.match(line.text)
+            and not _looks_like_entry_start(line.text)
+        ):
+            result[-1].text = f"{result[-1].text.rstrip()} {line.text}"
+        else:
+            result.append(line)
+    return result
+
+
+def _looks_like_entry_start(text: str) -> bool:
+    return bool(
+        ("|" in text and DATE_RE.search(text))
+        or re.search(r"\b(bachelor|master|mba|phd|doctor)\b", text, re.I)
+    )
 
 
 def _looks_like_heading(text: str) -> bool:
@@ -169,17 +240,32 @@ def parse_resume(lines: list[Line], filename: str) -> dict:
     for line in lines:
         canonical = _canonical_heading(line.text) if line.heading else None
         if canonical:
+            if canonical == "ignore":
+                current = "ignore"
+                continue
             current = canonical
             sections.setdefault(current, [])
             headings.setdefault(current, line.text.strip())
             if current not in order:
                 order.append(current)
             continue
-        if line.heading and current is None and not sections and len(line.text.split()) <= 5:
-            preamble.append(line.text)
+        if current == "ignore":
             continue
-        if line.heading and current == "experience" and line.level != 1:
-            sections[current].append(line.text)
+        if line.heading and current is None and not sections and len(line.text.split()) <= 5:
+            if not _looks_like_document_title(line.text):
+                preamble.append(line.text)
+            continue
+        if line.heading and line.level == 0 and line.text.isupper():
+            slug = _slug(line.text)
+            current = f"custom:{slug}"
+            sections.setdefault(current, [])
+            custom_titles[current] = line.text.strip()
+            if current not in order:
+                order.append(current)
+            continue
+        if line.heading and current and line.level != 1:
+            marker = ENTRY_MARKER if line.level in {0, 2} else SUBHEADING_MARKER
+            sections[current].append(f"{marker}{line.text}")
             continue
         if line.heading and (line.level == 1 or current is None):
             slug = _slug(line.text)
@@ -200,7 +286,11 @@ def parse_resume(lines: list[Line], filename: str) -> dict:
     all_text = "\n".join(line.text for line in lines)
     identity = _identity(preamble, all_text)
     custom_sections = [
-        {"id": key.split(":", 1)[1], "title": custom_titles[key], "lines": _unique(sections[key])}
+        {
+            "id": key.split(":", 1)[1],
+            "title": custom_titles[key],
+            "lines": _unique(_join_custom_lines(sections[key])),
+        }
         for key in order if key.startswith("custom:") and sections.get(key)
     ]
     parsed = {
@@ -209,7 +299,7 @@ def parse_resume(lines: list[Line], filename: str) -> dict:
         "experience": _experience(sections.get("experience", [])),
         "education": _education(sections.get("education", [])),
         "projects": _titled_bullets(sections.get("projects", []), "title"),
-        "leadership": _titled_bullets(sections.get("leadership", []), "organization"),
+        "leadership": _leadership(sections.get("leadership", [])),
         "skills": _skills(sections.get("skills", [])),
         "honors": _bullet_values(sections.get("honors", [])),
         "custom_sections": custom_sections,
@@ -228,7 +318,7 @@ def parse_resume(lines: list[Line], filename: str) -> dict:
 def _identity(preamble: list[str], all_text: str) -> dict:
     email = (EMAIL_RE.search(all_text).group(0) if EMAIL_RE.search(all_text) else "")
     phone_match = PHONE_RE.search(all_text)
-    phone = phone_match.group(0).strip() if phone_match else ""
+    phone = _format_phone(phone_match.group(0)) if phone_match else ""
     urls = [match.rstrip(".,;)") for match in URL_RE.findall(all_text)]
     name = ""
     location = ""
@@ -253,6 +343,23 @@ def _identity(preamble: list[str], all_text: str) -> dict:
             "url": normalized_url,
         })
     return {"name": name, "email": email, "phone": phone, "location": location, "links": links}
+
+
+def _looks_like_document_title(text: str) -> bool:
+    normalized = _heading_key(text)
+    return any(
+        phrase in normalized
+        for phrase in ("master resume", "career experience", "enrichment library", "bullet library")
+    )
+
+
+def _format_phone(value: str) -> str:
+    digits = re.sub(r"\D", "", value)
+    if len(digits) == 10:
+        return f"({digits[:3]}) {digits[3:6]}-{digits[6:]}"
+    if len(digits) == 11 and digits.startswith("1"):
+        return f"+1 ({digits[1:4]}) {digits[4:7]}-{digits[7:]}"
+    return value.strip()
 
 
 def _summary(lines: list[str]) -> str:
@@ -282,17 +389,41 @@ def _education(lines: list[str]) -> list[dict]:
     groups = _group_entries(lines)
     result = []
     for headers, bullets in groups:
-        values = headers + bullets
-        if not values:
+        if not headers:
             continue
-        joined = " | ".join(values)
-        parts = [part.strip() for part in re.split(r"\s*[|\u2022]\s*", joined) if part.strip()]
-        graduation = next((part for part in parts if DATE_RE.search(part)), "")
-        gpa_match = re.search(r"\bGPA\s*[:=]?\s*([0-4](?:\.\d{1,2})?)", joined, re.I)
+        primary = headers[0]
+        joined = " | ".join(headers + bullets)
+        parts = [
+            part.strip()
+            for part in re.split(r"\s*[|\u2022]\s*|\s+(?:[-\u2013\u2014\ufffd])\s+", primary)
+            if part.strip()
+        ]
+        graduation = next((part for part in reversed(parts) if DATE_RE.search(part)), "")
+        gpa_match = re.search(r"\bGPA\s*[:=]?\s*([0-4](?:\.\d{1,2})?)", primary, re.I)
         degree = next((part for part in parts if re.search(r"\b(bachelor|master|mba|phd|doctor|degree|b\.?s\.?|m\.?s\.?)\b", part, re.I)), "")
-        institution = next((part for part in parts if re.search(r"\b(university|college|institute|school)\b", part, re.I)), "")
-        honors = [part for part in parts if re.search(r"\b(honor|award|society|cum laude|dean)\b", part, re.I)]
-        result.append({"degree": degree, "field": "", "institution": institution, "location": "", "graduation": graduation, "gpa": gpa_match.group(1) if gpa_match else "", "honors": _unique(honors)})
+        institution = next((
+            part for part in parts
+            if part != degree and re.search(r"\b(university|college|institute|school|bits|vit)\b", part, re.I)
+        ), "")
+        location = next((
+            part for part in parts
+            if part not in {degree, institution, graduation}
+            and "," in part
+            and not re.search(r"\bGPA\b", part, re.I)
+        ), "")
+        honors = [
+            part for part in headers[1:] + bullets
+            if re.search(r"\b(honor|award|society|cum laude|dean)\b", part, re.I)
+        ]
+        result.append({
+            "degree": re.sub(r"\s*\(GPA.*?\)", "", degree, flags=re.I).strip(),
+            "field": "",
+            "institution": re.sub(r"\s*\(GPA.*?\)", "", institution, flags=re.I).strip(),
+            "location": location,
+            "graduation": graduation,
+            "gpa": gpa_match.group(1) if gpa_match else "",
+            "honors": _unique(honors),
+        })
     return result
 
 
@@ -304,6 +435,9 @@ def _skills(lines: list[str]) -> list[dict]:
             continue
         if ":" in clean:
             name, items = clean.split(":", 1)
+        elif result:
+            result[-1]["items"] = f"{result[-1]['items']} {clean}".strip()
+            continue
         else:
             name, items = "Core", clean
         result.append({"name": name.strip(), "items": items.strip()})
@@ -324,11 +458,44 @@ def _titled_bullets(lines: list[str], title_key: str) -> list[dict]:
     return result
 
 
+def _leadership(lines: list[str]) -> list[dict]:
+    result = []
+    for headers, bullets in _group_entries(lines):
+        if not headers and not bullets:
+            continue
+        primary = headers[0] if headers else ""
+        parts = [
+            part.strip()
+            for part in re.split(r"\s+(?:--|[-\u2013\u2014])\s+", primary)
+            if part.strip()
+        ]
+        organization = parts[0] if parts else primary
+        role = next((part for part in parts[1:] if ROLE_RE.search(part)), "")
+        if not role:
+            role = next((part for part in headers[1:] if ROLE_RE.search(part)), "")
+        result.append({
+            "organization": organization,
+            "role": role,
+            "bullets": _unique(bullets),
+        })
+    return result
+
+
 def _group_entries(lines: list[str]) -> list[tuple[list[str], list[str]]]:
     groups: list[tuple[list[str], list[str]]] = []
     headers: list[str] = []
     bullets: list[str] = []
     for raw in lines:
+        if raw.startswith(ENTRY_MARKER):
+            if headers or bullets:
+                groups.append((headers, bullets))
+            headers = [raw.removeprefix(ENTRY_MARKER).strip()]
+            bullets = []
+            continue
+        if raw.startswith(SUBHEADING_MARKER):
+            if not bullets:
+                headers.append(raw.removeprefix(SUBHEADING_MARKER).strip())
+            continue
         if BULLET_RE.match(raw):
             bullets.append(_clean_bullet(raw))
         else:
@@ -346,7 +513,18 @@ def _bullet_values(lines: list[str]) -> list[str]:
 
 
 def _clean_bullet(text: str) -> str:
-    return BULLET_RE.sub("", text).strip()
+    return _clean_markdown(BULLET_RE.sub("", text))
+
+
+def _join_custom_lines(lines: list[str]) -> list[str]:
+    result: list[str] = []
+    for line in lines:
+        clean = _clean_bullet(line)
+        if result and ":" not in clean and not BULLET_RE.match(line):
+            result[-1] = f"{result[-1]} {clean}"
+        elif clean:
+            result.append(clean)
+    return result
 
 
 def merge_profile(existing: dict, incoming_documents: list[dict]) -> tuple[dict, dict]:
@@ -586,40 +764,61 @@ def save_source(source: Path, original_name: str) -> str:
     return destination.name
 
 
+def rebuild_from_sources(existing: dict) -> tuple[dict, dict]:
+    """Reparse saved sources and rebuild generated Profile sections."""
+    source_names = existing.get("resume_blueprint", {}).get("source_files", [])
+    source_dir = config.DATA_DIR / "profile_sources"
+    documents = []
+    for name in source_names:
+        path = source_dir / Path(name).name
+        if not path.is_file() or path.suffix.lower() not in SUPPORTED_SUFFIXES:
+            continue
+        parsed = parse_resume(extract_lines(path), path.name)
+        parsed["resume_blueprint"]["source_files"] = [path.name]
+        documents.append(parsed)
+    if not documents:
+        raise ValueError("No saved resume sources are available to rebuild.")
+
+    identity = deepcopy(existing.get("identity", {}))
+    if identity.get("phone"):
+        identity["phone"] = _format_phone(identity["phone"])
+    seed = {"identity": identity}
+    return merge_profile(seed, documents)
+
+
 def enrichment_prompt(profile: dict) -> str:
     blocks = [
-        "# Resume Experience Enrichment Prompts",
+        "You are creating a factual master-resume bullet library from the Profile below.",
         "",
-        "Use each prompt in your preferred chatbot. Keep every claim factual. Afterward, save all responses in one Markdown file and upload it in Settings > Profile.",
+        "For every experience:",
+        "1. Generate a broad set of distinct resume bullets that can support different job descriptions.",
+        "2. Cover responsibilities, analysis, operations, communication, leadership, process improvement, and outcomes only when supported.",
+        "3. Use only the supplied facts. Never invent tools, metrics, scope, stakeholders, or outcomes.",
+        "4. Remove exact and near-duplicate bullets.",
+        "5. If important facts are missing, omit the claim instead of guessing.",
+        "",
+        "OUTPUT CONTRACT",
+        "- Create a file named profile-enrichment.md if this chatbot supports file creation.",
+        "- Otherwise return only the raw Markdown content, with no explanation and no code fence.",
+        "- Use exactly this importable structure for every experience:",
+        "",
+        "# Experience",
+        "## Company | Role | Dates",
+        "- Unique factual bullet",
+        "",
+        "PROFILE EXPERIENCE FACTS",
         "",
     ]
-    for index, experience in enumerate(profile.get("experience", []), 1):
+    for experience in profile.get("experience", []):
         company = experience.get("company", "")
         role = experience.get("role", "")
         date = experience.get("date", "")
-        bullets = "\n".join(f"- {bullet}" for bullet in experience.get("bullets", []) if bullet)
+        bullets = "\n".join(
+            f"- {bullet}" for bullet in experience.get("bullets", []) if bullet
+        )
         blocks.extend([
-            f"## Prompt {index}: {company} — {role}",
-            "",
-            "```text",
-            "You are building a factual master-resume bullet library. Expand the experience below into a comprehensive set of distinct resume bullets suitable for different job descriptions.",
-            "",
-            "Rules:",
-            "- Use only facts explicitly present below or additional facts I provide in this chat.",
-            "- Ask clarifying questions before adding scope, tools, metrics, stakeholders, or outcomes that are not supplied.",
-            "- Cover responsibilities, analysis, operations, communication, leadership, process improvement, and measurable outcomes when supported.",
-            "- Do not repeat or lightly paraphrase the same bullet.",
-            "- Return only the Markdown structure shown below.",
-            "",
-            "Required output:",
-            "# Experience",
             f"## {company} | {role} | {date}",
-            "- [unique factual bullet]",
-            "- [unique factual bullet]",
-            "",
-            "Existing facts:",
-            bullets or "- No bullets yet; ask me detailed questions about this experience.",
-            "```",
+            bullets or "- No factual bullets are currently available.",
             "",
         ])
     return "\n".join(blocks)

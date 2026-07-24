@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../api'
 import { inputCls, Field } from '../components/ui'
@@ -140,6 +141,8 @@ export function ProfileEditor() {
   const [draft, setDraft] = useState<Profile | null>(null)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [importMessage, setImportMessage] = useState('')
+  const [promptOpen, setPromptOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
   const clean = data ? normalizeProfile(data) : null
 
   useEffect(() => {
@@ -162,6 +165,33 @@ export function ProfileEditor() {
       )
     },
   })
+  const prompt = useMutation({
+    mutationFn: api.getProfileEnrichmentPrompt,
+    onSuccess: () => {
+      setCopied(false)
+      setPromptOpen(true)
+    },
+  })
+  const rebuild = useMutation({
+    mutationFn: api.rebuildProfile,
+    onSuccess: (result) => {
+      const next = normalizeProfile(result.profile)
+      setDraft(next)
+      queryClient.setQueryData(['config', 'profile'], result.profile)
+      setImportMessage(
+        `Profile rebuilt from ${result.stats.files} saved source(s); ${result.stats.duplicates_removed} duplicates removed.`,
+      )
+    },
+  })
+
+  useEffect(() => {
+    if (!promptOpen) return
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPromptOpen(false)
+    }
+    window.addEventListener('keydown', close)
+    return () => window.removeEventListener('keydown', close)
+  }, [promptOpen])
 
   if (!draft) return <p className="text-sm text-slate-500">Loading...</p>
 
@@ -205,6 +235,17 @@ export function ProfileEditor() {
     const saved = await api.getConfig<Profile>('profile')
     queryClient.setQueryData(['config', 'profile'], saved)
     setDraft(normalizeProfile(saved))
+  }
+
+  const doRebuild = () => {
+    if (!confirm('Rebuild the Profile from the saved source files? A backup of the current Profile will be created first.')) return
+    rebuild.mutate()
+  }
+
+  const copyPrompt = async () => {
+    if (!prompt.data?.prompt) return
+    await navigator.clipboard.writeText(prompt.data.prompt)
+    setCopied(true)
   }
 
   const renderExperience = () => (
@@ -311,10 +352,10 @@ export function ProfileEditor() {
             <h2 className="font-semibold">Resume sources</h2>
             <p className="mt-1 text-sm text-slate-500">DOCX, PDF, Markdown; up to 10 files per import.</p>
           </div>
-          <a href={api.profileEnrichmentPromptUrl}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800">
-            Download AI prompts
-          </a>
+          <button type="button" onClick={() => prompt.mutate()} disabled={prompt.isPending}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:hover:bg-slate-800">
+            {prompt.isPending ? 'Preparing...' : 'Open AI bullet prompt'}
+          </button>
         </div>
         <input ref={fileInput} type="file" multiple accept=".docx,.pdf,.md,.markdown" className="hidden"
           onChange={(event) => setSelectedFiles(Array.from(event.target.files ?? []).slice(0, 10))} />
@@ -333,12 +374,18 @@ export function ProfileEditor() {
         </div>
         {dirty && selectedFiles.length > 0 && <p className="mt-2 text-sm text-amber-600">Save or reset current edits before importing.</p>}
         {importFiles.error && <p className="mt-2 text-sm text-rose-600">{importFiles.error.message}</p>}
+        {prompt.error && <p className="mt-2 text-sm text-rose-600">{prompt.error.message}</p>}
+        {rebuild.error && <p className="mt-2 text-sm text-rose-600">{rebuild.error.message}</p>}
         {importMessage && <p className="mt-2 text-sm text-emerald-600">{importMessage}</p>}
         {draft.resume_blueprint.source_files.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             {draft.resume_blueprint.source_files.map((source) => (
               <span key={source} className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">{source}</span>
             ))}
+            <button type="button" onClick={doRebuild} disabled={dirty || rebuild.isPending}
+              className="ml-auto text-xs font-medium text-[var(--accent)] hover:underline disabled:opacity-40">
+              {rebuild.isPending ? 'Rebuilding...' : 'Rebuild from sources'}
+            </button>
           </div>
         )}
       </div>
@@ -403,6 +450,44 @@ export function ProfileEditor() {
         <SaveBar dirty={dirty} saving={save.isPending} saved={save.isSuccess} onSave={() => void doSave()} />
         <button onClick={doReset} className="text-sm text-slate-400 hover:text-rose-500">Reset to default</button>
       </div>
+
+      {promptOpen && prompt.data && createPortal((
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          role="dialog" aria-modal="true" aria-labelledby="profile-prompt-title"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) setPromptOpen(false)
+          }}>
+          <div className="flex h-[82vh] max-h-[88vh] w-full max-w-4xl flex-col rounded-lg bg-white shadow-2xl dark:bg-slate-950">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4 dark:border-slate-800">
+              <div>
+                <h2 id="profile-prompt-title" className="font-semibold">AI bullet-library prompt</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Paste this into a chatbot. Its Markdown output can be uploaded here as {prompt.data.filename}.
+                </p>
+              </div>
+              <button type="button" aria-label="Close prompt" title="Close"
+                onClick={() => setPromptOpen(false)}
+                className="h-9 w-9 shrink-0 rounded-md text-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
+                &times;
+              </button>
+            </div>
+            <textarea readOnly value={prompt.data.prompt}
+              className="m-5 min-h-0 flex-1 resize-none rounded-md border border-slate-300 bg-slate-50 p-4 font-mono text-xs leading-5 outline-none dark:border-slate-700 dark:bg-slate-900"
+              aria-label="Complete AI prompt" />
+            <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4 dark:border-slate-800">
+              <button type="button" onClick={() => setPromptOpen(false)}
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium dark:border-slate-700">
+                Close
+              </button>
+              <button type="button" onClick={() => void copyPrompt()}
+                className="rounded-md px-3 py-2 text-sm font-medium text-white"
+                style={{ background: 'var(--accent)' }}>
+                {copied ? 'Copied' : 'Copy entire prompt'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ), document.body)}
     </Section>
   )
 }

@@ -14,13 +14,15 @@ Later phases add: /api/search, /api/tailor, /api/applications, /api/plan,
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
+import json
 from pathlib import Path
 
 import tempfile
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field as PydanticField
 
@@ -142,13 +144,32 @@ async def import_profile(files: list[UploadFile] = File(...)) -> dict:
 
 
 @app.get("/api/profile/enrichment-prompt")
-def get_profile_enrichment_prompt() -> Response:
+def get_profile_enrichment_prompt() -> dict:
     prompt = profile_import.enrichment_prompt(config.load("profile"))
-    return Response(
-        prompt,
-        media_type="text/markdown",
-        headers={"Content-Disposition": 'attachment; filename="profile-enrichment-prompts.md"'},
+    return {"prompt": prompt, "filename": "profile-enrichment.md"}
+
+
+@app.post("/api/profile/rebuild")
+def rebuild_profile() -> dict:
+    current = config.load("profile")
+    backup_dir = config.DATA_DIR / "profile_backups"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    backup_name = f"profile-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
+    (backup_dir / backup_name).write_text(
+        json.dumps(current, indent=2, ensure_ascii=False),
+        encoding="utf-8",
     )
+    try:
+        profile, stats = profile_import.rebuild_from_sources(current)
+    except (ValueError, OSError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+    config.save("profile", profile)
+    return {
+        "profile": profile,
+        "stats": stats,
+        "sources": profile.get("resume_blueprint", {}).get("source_files", []),
+        "backup": backup_name,
+    }
 
 
 @app.post("/api/llm/test")
@@ -180,7 +201,7 @@ class OnboardingRequest(BaseModel):
     max_years_experience: int = 4
     output_dir: str = ""
     ai_enabled: bool = False
-    ai_provider: str = "claude"
+    ai_provider: str = "openrouter"
     ai_model: str = ""
     ai_api_key: str = ""
 
@@ -199,7 +220,14 @@ def onboarding_status() -> dict:
     rules = config.load("rules")
     identity = profile.get("identity", {})
     llm = settings.get("llm", {})
-    provider = llm.get("provider", "claude")
+    provider = llm.get("provider", "openrouter")
+    model_fields = {
+        "claude": "model",
+        "openai": "openai_model",
+        "openrouter": "openrouter_model",
+        "groq": "groq_model",
+        "ollama": "ollama_model",
+    }
     return {
         "complete": complete,
         "legacy_inferred": explicit is None and complete,
@@ -222,8 +250,7 @@ def onboarding_status() -> dict:
             "output_dir": settings.get("output_dir", ""),
             "ai_enabled": bool(llm.get("enabled")),
             "ai_provider": provider,
-            "ai_model": (llm.get("model", "") if provider == "claude"
-                         else llm.get("openai_model", "")),
+            "ai_model": llm.get(model_fields.get(provider, "openrouter_model"), ""),
             "ai_api_key": "",
         },
     }
@@ -239,8 +266,8 @@ def complete_onboarding(req: OnboardingRequest) -> dict:
         raise HTTPException(400, "Choose at least one target role family.")
     if not 0 <= req.max_years_experience <= 30:
         raise HTTPException(400, "Maximum years of experience must be between 0 and 30.")
-    if req.ai_provider not in {"claude", "openai"}:
-        raise HTTPException(400, "Choose Claude or OpenAI as the AI provider.")
+    if req.ai_provider not in {"claude", "openai", "openrouter", "groq", "ollama"}:
+        raise HTTPException(400, "Choose a supported AI provider.")
 
     profile = config.load("profile")
     identity = profile.setdefault("identity", {})
@@ -275,10 +302,15 @@ def complete_onboarding(req: OnboardingRequest) -> dict:
     llm = settings.setdefault("llm", {})
     llm["enabled"] = req.ai_enabled
     llm["provider"] = req.ai_provider
-    if req.ai_provider == "claude":
-        llm["model"] = req.ai_model.strip() or llm.get("model", "claude-sonnet-5")
-    else:
-        llm["openai_model"] = req.ai_model.strip() or llm.get("openai_model", "gpt-4o")
+    model_fields = {
+        "claude": ("model", "claude-sonnet-5"),
+        "openai": ("openai_model", "gpt-4o"),
+        "openrouter": ("openrouter_model", "openrouter/free"),
+        "groq": ("groq_model", "openai/gpt-oss-20b"),
+        "ollama": ("ollama_model", "gpt-oss:20b"),
+    }
+    model_field, default_model = model_fields[req.ai_provider]
+    llm[model_field] = req.ai_model.strip() or llm.get(model_field, default_model)
     if req.ai_api_key:
         llm.setdefault("api_keys", {})[req.ai_provider] = req.ai_api_key.strip()
 

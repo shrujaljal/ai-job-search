@@ -5,7 +5,8 @@ import unittest
 
 import tailoring
 from llm.base import LLMProvider, ProviderError
-from llm.prompts import build_user_prompt
+from llm.factory import create_provider
+from llm.prompts import build_system_prompt, build_user_prompt
 
 
 PROFILE = {
@@ -107,6 +108,39 @@ class TailoringTests(unittest.TestCase):
 
         self.assertNotIn('"identity"', prompt)
         self.assertNotIn('"name": "Candidate"', prompt)
+
+    def test_strictness_changes_rewrite_validation_not_fact_guardrails(self) -> None:
+        flexible = {"llm": {"enabled": True, "grounding_strictness": 20}}
+        context, meta = tailoring.build_tailored_context(
+            profile=PROFILE, content=CONTENT, family="General",
+            jd_text="Need Excel reporting experience", role="Analyst", company="Target",
+            settings=flexible,
+            provider=FakeProvider(proposal("Improved recurring business communication")),
+        )
+
+        self.assertEqual(meta["engine"], "ai")
+        self.assertEqual(
+            context["experiences"][0]["bullets"],
+            ["Improved recurring business communication"],
+        )
+        self.assertIn("Grounding strictness: 20/100", build_system_prompt(20))
+
+    def test_free_and_local_provider_factory_configuration(self) -> None:
+        openrouter = create_provider({
+            "provider": "openrouter",
+            "api_keys": {"openrouter": "test-key"},
+            "openrouter_model": "openrouter/free",
+        })
+        groq = create_provider({
+            "provider": "groq",
+            "api_keys": {"groq": "test-key"},
+            "groq_model": "openai/gpt-oss-20b",
+        })
+        ollama = create_provider({"provider": "ollama", "api_keys": {}})
+
+        self.assertEqual((openrouter.name, openrouter.model), ("openrouter", "openrouter/free"))
+        self.assertEqual((groq.name, groq.model), ("groq", "openai/gpt-oss-20b"))
+        self.assertEqual((ollama.name, ollama.model), ("ollama", "gpt-oss:20b"))
 
 
 if __name__ == "__main__":

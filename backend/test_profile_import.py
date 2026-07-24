@@ -34,6 +34,25 @@ jane@example.com | linkedin.com/in/jane-candidate | California
 Tools: Excel, SQL, Tableau
 """
 
+WRAPPED_LIBRARY = """# Master Career Experience Enrichment Library
+> Supplemental factual bullet library.
+
+# Teaching
+## Graduate Teaching Assistant
+**Example University**\\
+**2025 - Present**
+### Decision Analysis
+- Supported instruction in business analytics and quantitative
+  decision making.
+- Guided students through optimization and business modeling concepts.
+
+### Economics
+- Explained regression concepts using practical examples.
+
+# Next Steps
+Do not import this instruction.
+"""
+
 
 class ProfileImportTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -86,6 +105,25 @@ class ProfileImportTests(unittest.TestCase):
         self.assertGreaterEqual(stats["duplicates_removed"], 1)
         self.assertNotIn("Built weekly Excel dashboards used for leadership reporting.", bullets)
         self.assertEqual(merged["resume_blueprint"]["section_order"][0], "experience")
+
+    def test_wrapped_markdown_maps_teaching_to_one_experience(self) -> None:
+        path = Path(self.temp.name) / "library.md"
+        path.write_text(WRAPPED_LIBRARY, encoding="utf-8")
+
+        parsed = profile_import.parse_resume(profile_import.extract_lines(path), path.name)
+
+        self.assertEqual(parsed["identity"]["name"], "")
+        self.assertEqual(len(parsed["experience"]), 1)
+        teaching = parsed["experience"][0]
+        self.assertEqual(teaching["company"], "Example University")
+        self.assertEqual(teaching["role"], "Graduate Teaching Assistant")
+        self.assertEqual(teaching["date"], "2025 - Present")
+        self.assertEqual(len(teaching["bullets"]), 3)
+        self.assertEqual(
+            teaching["bullets"][0],
+            "Supported instruction in business analytics and quantitative decision making.",
+        )
+        self.assertNotIn("Next Steps", parsed["resume_blueprint"]["section_order"])
 
     def test_same_role_with_different_dates_remains_separate(self) -> None:
         existing = {
@@ -207,8 +245,14 @@ class ProfileImportTests(unittest.TestCase):
         self.assertTrue((config.DATA_DIR / "profile_sources" / "master.md").exists())
         prompt_response = client.get("/api/profile/enrichment-prompt")
         self.assertEqual(prompt_response.status_code, 200)
-        self.assertIn("Prompt 1: Acme", prompt_response.text)
-        self.assertIn("# Experience", prompt_response.text)
+        prompt_payload = prompt_response.json()
+        self.assertEqual(prompt_payload["filename"], "profile-enrichment.md")
+        self.assertIn("## Acme | Operations Analyst | 2024 - Present", prompt_payload["prompt"])
+        self.assertIn("# Experience", prompt_payload["prompt"])
+
+        rebuild_response = client.post("/api/profile/rebuild")
+        self.assertEqual(rebuild_response.status_code, 200, rebuild_response.text)
+        self.assertTrue(rebuild_response.json()["backup"].endswith(".json"))
 
 
 if __name__ == "__main__":

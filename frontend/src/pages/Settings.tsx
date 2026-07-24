@@ -12,8 +12,8 @@ const SECTIONS = [
   { key: 'appearance', label: '🎨 Appearance', el: <Appearance /> },
   { key: 'ai', label: '🤖 AI & Providers', el: <AI /> },
   { key: 'profile', label: '📇 Profile', el: <ProfileEditor /> },
-  { key: 'rules', label: '🎯 Scoring Rules', el: <RulesEditor /> },
-  { key: 'content', label: '📄 Résumé Content', el: <ContentEditor /> },
+  { key: 'rules', label: '🎯 Job Preferences', el: <RulesEditor /> },
+  { key: 'content', label: '📄 Tailoring Preferences', el: <ContentEditor /> },
 ]
 
 export default function Settings() {

@@ -31,7 +31,12 @@ export interface Settings {
     provider: string
     model: string
     openai_model: string
-    api_keys: { claude: string; openai: string }
+    openrouter_model: string
+    groq_model: string
+    ollama_model: string
+    ollama_base_url: string
+    grounding_strictness: number
+    api_keys: Record<string, string>
   }
   search: { boards: string[]; pages_per_board: number }
   [k: string]: unknown
@@ -55,7 +60,7 @@ export interface OnboardingPayload {
   max_years_experience: number
   output_dir: string
   ai_enabled: boolean
-  ai_provider: 'claude' | 'openai'
+  ai_provider: string
   ai_model: string
   ai_api_key: string
 }
@@ -69,6 +74,7 @@ export interface ProfileImportResult {
     sections_added: number
   }
   sources: string[]
+  backup?: string
 }
 
 export const api = {
@@ -95,7 +101,9 @@ export const api = {
     }
     return res.json() as Promise<ProfileImportResult>
   },
-  profileEnrichmentPromptUrl: '/api/profile/enrichment-prompt',
+  getProfileEnrichmentPrompt: () =>
+    req<{ prompt: string; filename: string }>('/profile/enrichment-prompt'),
+  rebuildProfile: () => req<ProfileImportResult>('/profile/rebuild', 'POST'),
 
   search: (payload: {
     roles: string[]; location: string; date_posted: string

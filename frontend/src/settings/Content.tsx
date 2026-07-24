@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { inputCls, Field } from '../components/ui'
 import { Section, SaveBar } from './parts'
 import { Repeater, TagList, Sub } from './fields'
@@ -12,8 +12,6 @@ interface FamilyContent {
   skill_categories: SkillCat[]
   projects: string[]
 }
-// Raw shape on disk: families is an object keyed by family name; other keys
-// (limits, bullet_library, …) are preserved untouched.
 interface RawContent {
   default_family?: string
   families?: Record<string, Omit<FamilyContent, 'name'>>
@@ -22,126 +20,164 @@ interface RawContent {
 interface Draft {
   default_family: string
   families: FamilyContent[]
-  rest: Record<string, unknown> // passthrough keys we don't edit here
-}
-
-function Group({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <details open className="rounded-2xl border border-slate-200 dark:border-slate-800">
-      <summary className="cursor-pointer select-none px-4 py-3 font-semibold">{title}</summary>
-      <div className="border-t border-slate-200 p-4 dark:border-slate-800">{children}</div>
-    </details>
-  )
+  rest: Record<string, unknown>
 }
 
 function toDraft(raw: RawContent): Draft {
   const { default_family, families, ...rest } = raw
-  const arr: FamilyContent[] = Object.entries(families ?? {}).map(([name, cfg]) => ({
-    name,
-    summary: cfg.summary ?? '',
-    coursework: cfg.coursework ?? '',
-    skill_categories: (cfg.skill_categories ?? []).map((c: any) => ({
-      name: c.name ?? c.category ?? c.label ?? '',
-      items: Array.isArray(c.items) ? c.items.join(', ') : c.items ?? '',
+  return {
+    default_family: default_family ?? '',
+    families: Object.entries(families ?? {}).map(([name, config]) => ({
+      name,
+      summary: config.summary ?? '',
+      coursework: config.coursework ?? '',
+      skill_categories: (config.skill_categories ?? []).map((category: any) => ({
+        name: category.name ?? category.category ?? category.label ?? '',
+        items: Array.isArray(category.items) ? category.items.join(', ') : category.items ?? '',
+      })),
+      projects: config.projects ?? [],
     })),
-    projects: cfg.projects ?? [],
-  }))
-  return { default_family: default_family ?? '', families: arr, rest }
+    rest,
+  }
 }
 
-function fromDraft(d: Draft): RawContent {
+function fromDraft(draft: Draft): RawContent {
   const families: Record<string, Omit<FamilyContent, 'name'>> = {}
-  for (const f of d.families) {
-    if (!f.name.trim()) continue
-    families[f.name.trim()] = {
-      summary: f.summary,
-      coursework: f.coursework,
-      skill_categories: f.skill_categories,
-      projects: f.projects,
+  for (const family of draft.families) {
+    if (!family.name.trim()) continue
+    families[family.name.trim()] = {
+      summary: family.summary,
+      coursework: family.coursework,
+      skill_categories: family.skill_categories,
+      projects: family.projects,
     }
   }
-  return { ...d.rest, default_family: d.default_family, families }
+  return { ...draft.rest, default_family: draft.default_family, families }
 }
+
+const emptyFamily = (): FamilyContent => ({
+  name: 'New role family',
+  summary: '',
+  coursework: '',
+  skill_categories: [],
+  projects: [],
+})
 
 export function ContentEditor() {
   const { data, save, reset } = useConfig<RawContent>('resume_content')
-  const [d, setD] = useState<Draft | null>(null)
-  // Initialize the draft once; background refetches won't clobber in-progress edits.
-  useEffect(() => { if (data && !d) setD(toDraft(data)) }, [data, d])
-  if (!d) return <p className="text-sm text-slate-500">Loading…</p>
+  const [draft, setDraft] = useState<Draft | null>(null)
+  const [activeIndex, setActiveIndex] = useState(0)
+  useEffect(() => { if (data && !draft) setDraft(toDraft(data)) }, [data, draft])
+  if (!draft) return <p className="text-sm text-slate-500">Loading...</p>
 
+  const dirty = data
+    ? JSON.stringify(fromDraft(draft)) !== JSON.stringify(fromDraft(toDraft(data)))
+    : false
+  const active = draft.families[activeIndex]
+  const updateActive = (patch: Partial<FamilyContent>) => {
+    const families = draft.families.map((family, index) =>
+      index === activeIndex ? { ...family, ...patch } : family)
+    setDraft({ ...draft, families })
+  }
+  const addFamily = () => {
+    setDraft({ ...draft, families: [...draft.families, emptyFamily()] })
+    setActiveIndex(draft.families.length)
+  }
+  const removeFamily = () => {
+    if (!active || !confirm(`Remove "${active.name}" from tailoring preferences?`)) return
+    const families = draft.families.filter((_, index) => index !== activeIndex)
+    setDraft({
+      ...draft,
+      families,
+      default_family: draft.default_family === active.name ? '' : draft.default_family,
+    })
+    setActiveIndex(Math.max(0, activeIndex - 1))
+  }
   const doReset = async () => {
-    if (!confirm('Reset résumé content to the shipped default? Your edits will be lost.')) return
+    if (!confirm('Reset tailoring preferences to the shipped default?')) return
     const fresh = await reset.mutateAsync()
-    setD(toDraft(fresh))
+    setDraft(toDraft(fresh))
+    setActiveIndex(0)
   }
 
-  // Compare in the on-disk shape so key reordering doesn't read as a change.
-  const dirty = data ? JSON.stringify(fromDraft(d)) !== JSON.stringify(fromDraft(toDraft(data))) : false
-  const names = d.families.map((f) => f.name).filter(Boolean)
-
   return (
-    <Section title="Résumé Content"
-      desc="Per-role-family tailoring: which summary, coursework, skills, and projects the generator uses. It only selects and rephrases from your Profile — it never invents facts.">
-      <Group title="Default family">
-        <p className="mb-3 text-sm text-slate-500">Used when a job doesn't clearly match any family below.</p>
-        <div className="max-w-md">
-          <Field label="Default family">
-            <select className={inputCls} value={d.default_family} onChange={(e) => setD({ ...d, default_family: e.target.value })}>
-              <option value="">— none —</option>
-              {names.map((n) => <option key={n} value={n}>{n}</option>)}
+    <Section title="Tailoring Preferences"
+      desc="Set the preferred summary for each role family. Everything else comes from Profile unless you add an optional override.">
+      <div className="rounded-lg border border-slate-200 p-5 dark:border-slate-800">
+        <div className="grid gap-4 md:grid-cols-2">
+          <Field label="Default role family">
+            <select className={inputCls} value={draft.default_family}
+              onChange={(event) => setDraft({ ...draft, default_family: event.target.value })}>
+              <option value="">None</option>
+              {draft.families.map((family) =>
+                <option key={family.name} value={family.name}>{family.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Edit role family">
+            <select className={inputCls} value={active ? activeIndex : ''}
+              onChange={(event) => setActiveIndex(Number(event.target.value))}>
+              {draft.families.map((family, index) =>
+                <option key={`${family.name}-${index}`} value={index}>{family.name}</option>)}
             </select>
           </Field>
         </div>
-      </Group>
 
-      <Group title="Families">
-        <p className="mb-3 text-sm text-slate-500">
-          One entry per role family. The name must match a family in <b>Scoring Rules</b> for auto-detection to pick it.
-        </p>
-        <Repeater<FamilyContent> items={d.families} onChange={(families) => setD({ ...d, families })}
-          empty={() => ({ name: '', summary: '', coursework: '', skill_categories: [{ name: '', items: '' }], projects: [] })}
-          addLabel="Add family"
-          render={(f, up) => (
-            <>
-              <Field label="Family name">
-                <input className={inputCls} placeholder="e.g. Strategy & Operations" value={f.name} onChange={(e) => up({ name: e.target.value })} />
-              </Field>
-              <div className="mt-3">
-                <Sub label="Summary (tailored profile statement for this family)">
-                  <textarea className={inputCls} rows={3} value={f.summary} onChange={(e) => up({ summary: e.target.value })}
-                    placeholder="Leave blank to fall back to the Profile default summary." />
-                </Sub>
-              </div>
-              <div className="mt-1">
-                <Sub label="Relevant coursework (optional, shown under Education)">
-                  <input className={inputCls} value={f.coursework} onChange={(e) => up({ coursework: e.target.value })}
-                    placeholder="e.g. Business Analytics, Operations Management" />
-                </Sub>
-              </div>
-              <div className="mt-1">
-                <Sub label="Skill categories (override the Profile skills for this family)">
-                  <Repeater<SkillCat> items={f.skill_categories} onChange={(skill_categories) => up({ skill_categories })}
+        {active ? (
+          <div className="mt-5 space-y-4 border-t border-slate-200 pt-5 dark:border-slate-800">
+            <Field label="Role family name">
+              <input className={inputCls} value={active.name}
+                onChange={(event) => updateActive({ name: event.target.value })} />
+            </Field>
+            <Field label="Preferred summary">
+              <textarea className={inputCls} rows={4} value={active.summary}
+                onChange={(event) => updateActive({ summary: event.target.value })}
+                placeholder="Leave blank to use the Profile summary." />
+            </Field>
+
+            <details className="border-t border-slate-200 pt-4 dark:border-slate-800">
+              <summary className="cursor-pointer text-sm font-semibold">Optional overrides</summary>
+              <div className="mt-4 space-y-4">
+                <Field label="Relevant coursework">
+                  <input className={inputCls} value={active.coursework}
+                    onChange={(event) => updateActive({ coursework: event.target.value })} />
+                </Field>
+                <Sub label="Skill categories">
+                  <Repeater<SkillCat> items={active.skill_categories}
+                    onChange={(skill_categories) => updateActive({ skill_categories })}
                     empty={() => ({ name: '', items: '' })} addLabel="Add skill category"
-                    render={(s, sup) => (
-                      <div className="grid gap-2 md:grid-cols-[200px_1fr]">
-                        <input className={inputCls} placeholder="Category" value={s.name} onChange={(e) => sup({ name: e.target.value })} />
-                        <input className={inputCls} placeholder="Comma-separated skills" value={s.items} onChange={(e) => sup({ items: e.target.value })} />
+                    render={(category, update) => (
+                      <div className="grid gap-2 md:grid-cols-[180px_1fr]">
+                        <input className={inputCls} placeholder="Category" value={category.name}
+                          onChange={(event) => update({ name: event.target.value })} />
+                        <input className={inputCls} placeholder="Comma-separated skills" value={category.items}
+                          onChange={(event) => update({ items: event.target.value })} />
                       </div>
                     )} />
                 </Sub>
-              </div>
-              <div className="mt-1">
-                <Sub label="Featured projects (by title — must match a Profile project)">
-                  <TagList value={f.projects} onChange={(projects) => up({ projects })} placeholder="Add a project title, press Enter" />
+                <Sub label="Featured Profile projects">
+                  <TagList value={active.projects} onChange={(projects) => updateActive({ projects })}
+                    placeholder="Add an exact Profile project title" />
                 </Sub>
               </div>
-            </>
-          )} />
-      </Group>
+            </details>
+          </div>
+        ) : (
+          <p className="mt-5 text-sm text-slate-500">Add a role family to create tailoring preferences.</p>
+        )}
+
+        <div className="mt-5 flex gap-3">
+          <button type="button" onClick={addFamily}
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium dark:border-slate-700">
+            Add role family
+          </button>
+          {active && <button type="button" onClick={removeFamily}
+            className="text-sm font-medium text-rose-600">Remove</button>}
+        </div>
+      </div>
 
       <div className="flex items-center justify-between">
-        <SaveBar dirty={dirty} saving={save.isPending} saved={save.isSuccess} onSave={() => save.mutate(fromDraft(d))} />
+        <SaveBar dirty={dirty} saving={save.isPending} saved={save.isSuccess}
+          onSave={() => save.mutate(fromDraft(draft))} />
         <button onClick={doReset} className="text-sm text-slate-400 hover:text-rose-500">Reset to default</button>
       </div>
     </Section>
