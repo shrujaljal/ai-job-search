@@ -11,11 +11,14 @@ import main
 class OnboardingTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
+        self.original_data_root = config.DATA_ROOT
         self.original_data_dir = config.DATA_DIR
-        config.DATA_DIR = Path(self.temp.name)
-        config.ensure_config()
+        config.DATA_ROOT = Path(self.temp.name) / "data"
+        config.DATA_DIR = config.DATA_ROOT
+        config.initialize_accounts()
 
     def tearDown(self) -> None:
+        config.DATA_ROOT = self.original_data_root
         config.DATA_DIR = self.original_data_dir
         self.temp.cleanup()
 
@@ -65,6 +68,30 @@ class OnboardingTests(unittest.TestCase):
         self.assertEqual(rules["preferred_locations"], ["california", "remote"])
         self.assertEqual(rules["max_years_experience"], 5)
         self.assertEqual(next(f for f in rules["role_families"] if f["name"] == role)["tier"], 1)
+
+    def test_completion_adds_custom_target_role(self) -> None:
+        main.complete_onboarding(main.OnboardingRequest(
+            full_name="Ada Lovelace",
+            target_roles=["Customer Experience Strategy"],
+            ai_enabled=False,
+        ))
+
+        families = config.load("rules")["role_families"]
+        custom = next(f for f in families if f["name"] == "Customer Experience Strategy")
+        self.assertEqual(custom["tier"], 1)
+        self.assertIn("customer experience strategy", custom["keywords"])
+
+    def test_existing_target_role_match_is_case_insensitive(self) -> None:
+        existing = config.load("rules")["role_families"][0]["name"]
+        main.complete_onboarding(main.OnboardingRequest(
+            full_name="Ada Lovelace",
+            target_roles=[existing.lower(), existing],
+            ai_enabled=False,
+        ))
+
+        families = config.load("rules")["role_families"]
+        self.assertEqual(sum(1 for family in families
+                             if family["name"].casefold() == existing.casefold()), 1)
 
     def test_reset_preserves_values_and_reopens_wizard(self) -> None:
         settings = config.load("settings")

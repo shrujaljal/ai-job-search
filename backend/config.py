@@ -179,18 +179,81 @@ def create_account(name: str) -> dict:
     if not cleaned_name:
         raise ValueError("Account name is required.")
     data = accounts()
+    previous_active_id = data.get("active_id", "default")
     stem = _ACCOUNT_ID.sub("-", cleaned_name.lower()).strip("-")[:36] or "profile"
     account_id = f"{stem}-{uuid4().hex[:6]}"
     account = {
         "id": account_id,
         "name": cleaned_name,
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "setup_pending": True,
+        "setup_complete": False,
+        "return_to_id": previous_active_id,
     }
     data.setdefault("accounts", []).append(account)
     data["active_id"] = account_id
     _write_accounts(data)
     activate_account(account_id)
     return account
+
+
+def can_cancel_account_setup() -> bool:
+    data = accounts()
+    active_id = data.get("active_id", "default")
+    if active_id == "default":
+        return False
+    account = next((item for item in data.get("accounts", [])
+                    if item.get("id") == active_id), None)
+    if account is None:
+        return False
+    if account.get("setup_complete"):
+        return False
+    settings = load("settings")
+    return bool(account.get("setup_pending") or not settings.get("onboarding_complete"))
+
+
+def finish_account_setup() -> None:
+    data = accounts()
+    active_id = data.get("active_id", "default")
+    account = next((item for item in data.get("accounts", [])
+                    if item.get("id") == active_id), None)
+    if account is None:
+        return
+    account["setup_complete"] = True
+    account.pop("setup_pending", None)
+    account.pop("return_to_id", None)
+    _write_accounts(data)
+
+
+def cancel_account_setup() -> dict:
+    """Remove an unfinished secondary profile and restore its previous profile."""
+    global DATA_DIR
+    data = accounts()
+    active_id = data.get("active_id", "default")
+    account = next((item for item in data.get("accounts", [])
+                    if item.get("id") == active_id), None)
+    if active_id == "default" or account is None or not can_cancel_account_setup():
+        raise ValueError("This profile setup cannot be cancelled.")
+
+    valid_ids = {item.get("id") for item in data.get("accounts", [])}
+    return_to_id = account.get("return_to_id")
+    if return_to_id not in valid_ids or return_to_id == active_id:
+        return_to_id = "default"
+    target = _account_dir(active_id).resolve()
+    account_root = (DATA_ROOT / "accounts").resolve()
+    if account_root not in target.parents:
+        raise RuntimeError("Refusing to remove a profile outside the accounts directory.")
+
+    data["accounts"] = [
+        item for item in data.get("accounts", []) if item.get("id") != active_id
+    ]
+    data["active_id"] = return_to_id
+    _write_accounts(data)
+    DATA_DIR = _account_dir(return_to_id)
+    ensure_config()
+    if target.exists():
+        shutil.rmtree(target)
+    return next(item for item in data["accounts"] if item.get("id") == return_to_id)
 
 
 def rename_account(account_id: str, name: str) -> dict:

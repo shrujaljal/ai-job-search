@@ -254,6 +254,30 @@ def _profile_is_configured(profile: dict) -> bool:
     return bool(name and name not in {"your name", "name"})
 
 
+def _clean_target_roles(values: list[str]) -> list[str]:
+    roles: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        role = re.sub(r"\s+", " ", value).strip()
+        key = role.casefold()
+        if role and key not in seen:
+            seen.add(key)
+            roles.append(role)
+    return roles
+
+
+def _role_keywords(role: str) -> list[str]:
+    base = role.casefold()
+    variants = [base]
+    if "&" in base:
+        variants.append(re.sub(r"\s*&\s*", " and ", base))
+    if " and " in base:
+        variants.append(base.replace(" and ", " & "))
+    if "/" in base:
+        variants.append(re.sub(r"\s*/\s*", " ", base))
+    return list(dict.fromkeys(re.sub(r"\s+", " ", value).strip() for value in variants))
+
+
 @app.get("/api/onboarding")
 def onboarding_status() -> dict:
     settings = config.load("settings")
@@ -273,6 +297,7 @@ def onboarding_status() -> dict:
     }
     return {
         "complete": complete,
+        "can_cancel": config.can_cancel_account_setup(),
         "legacy_inferred": explicit is None and complete,
         "role_families": [
             {"name": family.get("name", ""), "tier": family.get("tier", 3)}
@@ -302,11 +327,15 @@ def onboarding_status() -> dict:
 @app.post("/api/onboarding")
 def complete_onboarding(req: OnboardingRequest) -> dict:
     name = req.full_name.strip()
-    selected_roles = {role.strip() for role in req.target_roles if role.strip()}
+    selected_roles = _clean_target_roles(req.target_roles)
     if not name:
         raise HTTPException(400, "Full name is required.")
     if not selected_roles:
-        raise HTTPException(400, "Choose at least one target role family.")
+        raise HTTPException(400, "Add at least one target role.")
+    if len(selected_roles) > 20:
+        raise HTTPException(400, "Add no more than 20 target roles.")
+    if any(len(role) > 100 for role in selected_roles):
+        raise HTTPException(400, "Target role names must be 100 characters or fewer.")
     if not 0 <= req.max_years_experience <= 30:
         raise HTTPException(400, "Maximum years of experience must be between 0 and 30.")
     if req.ai_provider not in {"claude", "openai", "openrouter", "groq", "ollama"}:
@@ -322,12 +351,21 @@ def complete_onboarding(req: OnboardingRequest) -> dict:
     })
 
     rules = config.load("rules")
-    known_roles = {family.get("name") for family in rules.get("role_families", [])}
-    unknown_roles = selected_roles - known_roles
-    if unknown_roles:
-        raise HTTPException(400, f"Unknown role families: {', '.join(sorted(unknown_roles))}")
-    for family in rules.get("role_families", []):
-        if family.get("name") in selected_roles:
+    families = rules.setdefault("role_families", [])
+    known_roles = {
+        str(family.get("name", "")).casefold(): family
+        for family in families if family.get("name")
+    }
+    selected_names: set[str] = set()
+    for role in selected_roles:
+        family = known_roles.get(role.casefold())
+        if family is None:
+            family = {"name": role, "tier": 1, "keywords": _role_keywords(role)}
+            families.append(family)
+            known_roles[role.casefold()] = family
+        selected_names.add(family["name"])
+    for family in families:
+        if family.get("name") in selected_names:
             family["tier"] = 1
         elif int(family.get("tier", 3)) == 1:
             family["tier"] = 2
@@ -360,11 +398,22 @@ def complete_onboarding(req: OnboardingRequest) -> dict:
     config.save("profile", profile)
     config.save("rules", rules)
     config.save("settings", settings)
+    config.finish_account_setup()
     return {"complete": True}
+
+
+@app.post("/api/onboarding/cancel")
+def cancel_onboarding() -> dict:
+    try:
+        account = config.cancel_account_setup()
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return {"cancelled": True, "active_id": account["id"]}
 
 
 @app.post("/api/onboarding/reset")
 def reset_onboarding() -> dict:
+    config.finish_account_setup()
     settings = config.load("settings")
     settings["onboarding_complete"] = False
     config.save("settings", settings)

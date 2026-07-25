@@ -45,6 +45,7 @@ export interface Settings {
 
 export interface OnboardingStatus {
   complete: boolean
+  can_cancel: boolean
   legacy_inferred: boolean
   role_families: { name: string; tier: number }[]
   defaults: OnboardingPayload
@@ -84,6 +85,8 @@ export const api = {
   getOnboarding: () => req<OnboardingStatus>('/onboarding'),
   completeOnboarding: (payload: OnboardingPayload) =>
     req<{ complete: boolean }>('/onboarding', 'POST', payload),
+  cancelOnboarding: () =>
+    req<{ cancelled: boolean; active_id: string }>('/onboarding/cancel', 'POST'),
   resetOnboarding: () => req<{ complete: boolean }>('/onboarding/reset', 'POST'),
 
   getConfig: <T = Record<string, unknown>>(name: string) => req<T>(`/config/${name}`),

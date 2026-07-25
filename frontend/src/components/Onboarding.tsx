@@ -12,7 +12,17 @@ export function Onboarding({ status }: { status: OnboardingStatus }) {
   const [step, setStep] = useState(0)
   const [draft, setDraft] = useState<OnboardingPayload>(() => ({ ...status.defaults }))
   const [locations, setLocations] = useState(status.defaults.preferred_locations.join(', '))
+  const [customRole, setCustomRole] = useState('')
+  const [cancelOpen, setCancelOpen] = useState(false)
   const selected = useMemo(() => new Set(draft.target_roles), [draft.target_roles])
+  const knownRoles = useMemo(
+    () => new Map(status.role_families.map((family) => [family.name.toLowerCase(), family.name])),
+    [status.role_families],
+  )
+  const customTargets = useMemo(
+    () => draft.target_roles.filter((role) => !knownRoles.has(role.toLowerCase())),
+    [draft.target_roles, knownRoles],
+  )
 
   const complete = useMutation({
     mutationFn: () => api.completeOnboarding({
@@ -27,9 +37,23 @@ export function Onboarding({ status }: { status: OnboardingStatus }) {
       ])
     },
   })
+  const cancel = useMutation({
+    mutationFn: api.cancelOnboarding,
+    onSuccess: () => window.location.reload(),
+  })
 
   const set = <K extends keyof OnboardingPayload,>(key: K, value: OnboardingPayload[K]) =>
     setDraft((current) => ({ ...current, [key]: value }))
+  const addCustomRole = () => {
+    const role = customRole.replace(/\s+/g, ' ').trim()
+    if (!role || draft.target_roles.length >= 20) return
+    const existing = draft.target_roles.find((item) => item.toLowerCase() === role.toLowerCase())
+    if (!existing) {
+      const knownName = knownRoles.get(role.toLowerCase())
+      set('target_roles', [...draft.target_roles, knownName ?? role])
+    }
+    setCustomRole('')
+  }
   const canContinue = step !== 0 || Boolean(draft.full_name.trim())
   const canFinish = draft.target_roles.length > 0 && Boolean(draft.full_name.trim())
 
@@ -70,6 +94,7 @@ export function Onboarding({ status }: { status: OnboardingStatus }) {
                     <Field label="Work authorization"><input className={inputCls} value={draft.work_authorization} onChange={(e) => set('work_authorization', e.target.value)} placeholder="e.g. OPT through 2027" /></Field>
                   </div>
                   <Toggle checked={draft.needs_sponsorship} onChange={(value) => set('needs_sponsorship', value)} label="I need employment visa sponsorship" />
+                  {cancel.isError && <p className="text-sm text-rose-600">{cancel.error.message}</p>}
                 </div>
               )}
 
@@ -90,7 +115,40 @@ export function Onboarding({ status }: { status: OnboardingStatus }) {
                       )
                     })}
                   </div>
-                  {draft.target_roles.length === 0 && <p className="text-sm text-rose-600">Choose at least one role family.</p>}
+                  <div>
+                    <Field label="Add your own target role">
+                      <div className="flex gap-2">
+                        <input className={inputCls} value={customRole}
+                          onChange={(event) => setCustomRole(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault()
+                              addCustomRole()
+                            }
+                          }}
+                          maxLength={100} placeholder="e.g. Customer Experience Strategy" />
+                        <Button type="button" variant="ghost"
+                          disabled={!customRole.trim() || draft.target_roles.length >= 20}
+                          onClick={addCustomRole}>Add role</Button>
+                      </div>
+                    </Field>
+                    {customTargets.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2" aria-label="Custom target roles">
+                        {customTargets.map((role) => (
+                          <span key={role}
+                            className="flex items-center gap-2 rounded-full bg-sky-100 px-3 py-1.5 text-sm text-sky-800 dark:bg-sky-950 dark:text-sky-200">
+                            {role}
+                            <button type="button" title={`Remove ${role}`} aria-label={`Remove ${role}`}
+                              className="text-base leading-none text-sky-600 hover:text-rose-600"
+                              onClick={() => set('target_roles', draft.target_roles.filter((item) => item !== role))}>
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {draft.target_roles.length === 0 && <p className="text-sm text-rose-600">Choose or add at least one target role.</p>}
                   <div className="grid gap-4 sm:grid-cols-[1fr_180px]">
                     <Field label="Preferred locations (comma-separated)"><input className={inputCls} value={locations} onChange={(e) => setLocations(e.target.value)} placeholder="California, New York, Remote" /></Field>
                     <Field label="Maximum experience requested"><input type="number" min={0} max={30} className={inputCls} value={draft.max_years_experience} onChange={(e) => set('max_years_experience', Number(e.target.value))} /></Field>
@@ -150,12 +208,37 @@ export function Onboarding({ status }: { status: OnboardingStatus }) {
         </div>
 
         <footer className="flex items-center justify-between border-t border-slate-200 px-5 py-4 dark:border-slate-800 sm:px-8">
-          <Button variant="ghost" disabled={step === 0 || complete.isPending} onClick={() => setStep((value) => value - 1)}>Back</Button>
+          {step === 0 && status.can_cancel
+            ? <Button variant="ghost" disabled={cancel.isPending}
+                onClick={() => setCancelOpen(true)}>Cancel profile creation</Button>
+            : <Button variant="ghost" disabled={step === 0 || complete.isPending}
+                onClick={() => setStep((value) => value - 1)}>Back</Button>}
           {step < STEPS.length - 1
             ? <Button disabled={!canContinue || (step === 1 && draft.target_roles.length === 0)} onClick={() => setStep((value) => value + 1)}>Continue</Button>
             : <Button disabled={!canFinish || complete.isPending} onClick={() => complete.mutate()}>{complete.isPending ? 'Saving setup...' : 'Finish setup'}</Button>}
         </footer>
       </section>
+      {cancelOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          role="dialog" aria-modal="true" aria-labelledby="cancel-profile-title"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setCancelOpen(false) }}>
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl dark:bg-slate-900">
+            <h2 id="cancel-profile-title" className="text-lg font-semibold">Discard this profile?</h2>
+            <p className="mt-2 text-sm text-slate-500">
+              This unfinished profile will be removed and your previous profile will be restored.
+            </p>
+            {cancel.isError && <p className="mt-3 text-sm text-rose-600">{cancel.error.message}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="ghost" disabled={cancel.isPending}
+                onClick={() => setCancelOpen(false)}>Keep profile</Button>
+              <Button variant="danger" disabled={cancel.isPending}
+                onClick={() => cancel.mutate()}>
+                {cancel.isPending ? 'Discarding...' : 'Discard profile'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }
