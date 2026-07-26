@@ -49,7 +49,7 @@ This repo is a job application workspace. Claude acts as a career advisor and ap
   - Analyzed manual vs. automated reporting workflows; proposed process improvements
   - Used Qlik Sense and JIRA for operational reporting and issue tracking
 
-- **Data Analyst Intern** (Jun 2022 – Aug 2022) - **Beyond Key**
+- **Data Analyst Intern** (Jan 2022 – Aug 2022) - **Beyond Key**
   - Retrieved and analyzed business data using SQL; developed Tableau dashboards for clients
   - Cleaned and validated datasets; identified trends supporting operational decisions
   - Applied Python (Pandas, NumPy) for data preparation and exploratory analysis

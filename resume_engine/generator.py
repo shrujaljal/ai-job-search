@@ -2,8 +2,8 @@
 Resume generator that produces Word documents matching Shrujal's resume template.
 
 Layout: single borderless table, A4 page, 0.5" margins, 10pt Calibri.
-Two-column grid: 7986 twips (left) + 2480 twips (right).
-Section order: summary, skills, experience, education, honors/awards.
+Three-column grid: 7387 + 184 + 2895 twips.
+Section order: summary, experience, education, skills, honors/awards.
 Section headers are bold blue (#2F5496) with a bottom rule.
 """
 
@@ -17,9 +17,11 @@ from .models import ResumeData
 from .content_rules import enforce
 
 # ── Layout constants (twips; 1440 twips = 1 inch) ───────────────────────────
-COL1_W = 7986
-COL2_W = 2480
-TOTAL_W = COL1_W + COL2_W
+COL1_W = 7387
+COL2_W = 184
+COL3_W = 2895
+LEFT_W = COL1_W + COL2_W
+TOTAL_W = COL1_W + COL2_W + COL3_W
 
 # ── Style constants ──────────────────────────────────────────────────────────
 BLUE = "2F5496"
@@ -107,6 +109,23 @@ def _line_break() -> OxmlElement:
     return OxmlElement("w:br")
 
 
+def _tab() -> OxmlElement:
+    run = OxmlElement("w:r")
+    run.append(_rpr(sz=SZ))
+    run.append(OxmlElement("w:tab"))
+    return run
+
+
+def _add_right_tab_stop(paragraph: OxmlElement, position=10080) -> None:
+    p_pr = paragraph.find(qn("w:pPr"))
+    tabs = OxmlElement("w:tabs")
+    tab = OxmlElement("w:tab")
+    tab.set(qn("w:val"), "right")
+    tab.set(qn("w:pos"), str(position))
+    tabs.append(tab)
+    p_pr.append(tabs)
+
+
 def _external_rel_id(doc: Document, url: str) -> str:
     return doc.part.relate_to(url, RELATIONSHIP_TYPE.HYPERLINK, is_external=True)
 
@@ -167,7 +186,7 @@ def _new_row(table) -> OxmlElement:
 
 
 def _span_cell(tr, content_paras: list, bottom_border=False) -> None:
-    """Add a single cell spanning both columns to a row."""
+    """Add a single cell spanning the full three-column table."""
     tc = OxmlElement("w:tc")
     tcPr = OxmlElement("w:tcPr")
     tcW = OxmlElement("w:tcW")
@@ -175,7 +194,7 @@ def _span_cell(tr, content_paras: list, bottom_border=False) -> None:
     tcW.set(qn("w:type"), "dxa")
     tcPr.append(tcW)
     gridSpan = OxmlElement("w:gridSpan")
-    gridSpan.set(qn("w:val"), "2")
+    gridSpan.set(qn("w:val"), "3")
     tcPr.append(gridSpan)
     if bottom_border:
         tcBorders = OxmlElement("w:tcBorders")
@@ -193,15 +212,21 @@ def _span_cell(tr, content_paras: list, bottom_border=False) -> None:
 
 
 def _two_cells(tr, left_paras: list, right_paras: list,
-               left_w=COL1_W, right_w=COL2_W) -> None:
+               left_w=LEFT_W, right_w=COL3_W) -> None:
     """Add two cells to a row."""
-    for w, paras in [(left_w, left_paras), (right_w, right_paras)]:
+    for index, (w, paras) in enumerate(
+        [(left_w, left_paras), (right_w, right_paras)]
+    ):
         tc = OxmlElement("w:tc")
         tcPr = OxmlElement("w:tcPr")
         tcW = OxmlElement("w:tcW")
         tcW.set(qn("w:w"), str(w))
         tcW.set(qn("w:type"), "dxa")
         tcPr.append(tcW)
+        if index == 0:
+            gridSpan = OxmlElement("w:gridSpan")
+            gridSpan.set(qn("w:val"), "2")
+            tcPr.append(gridSpan)
         tc.append(tcPr)
         for p in paras:
             tc.append(p)
@@ -217,19 +242,17 @@ def _set_table_geometry(table) -> None:
     if tblW is None:
         tblW = OxmlElement("w:tblW")
         tblPr.insert(0, tblW)
-    tblW.set(qn("w:w"), str(TOTAL_W))
-    tblW.set(qn("w:type"), "dxa")
+    tblW.set(qn("w:w"), "0")
+    tblW.set(qn("w:type"), "auto")
 
     layout = tblPr.find(qn("w:tblLayout"))
-    if layout is None:
-        layout = OxmlElement("w:tblLayout")
-        tblPr.append(layout)
-    layout.set(qn("w:type"), "fixed")
+    if layout is not None:
+        tblPr.remove(layout)
 
     grid = tbl.tblGrid
     for col in list(grid):
         grid.remove(col)
-    for width in (COL1_W, COL2_W):
+    for width in (COL1_W, COL2_W, COL3_W):
         col = OxmlElement("w:gridCol")
         col.set(qn("w:w"), str(width))
         grid.append(col)
@@ -277,14 +300,16 @@ def _build_summary_row(table, data: ResumeData) -> None:
     _span_cell(tr, [p])
 
 
-def _build_experience_header(table, company: str, role: str, date: str) -> None:
+def _build_experience_header(
+    table, company: str, role: str, date: str, space_before=60
+) -> None:
     tr = _new_row(table)
     # Left: "Company | Role"
-    lp = _para(justify=True)
+    lp = _para(justify=True, space_before=space_before)
     lp.append(_run(f"{company} | ", bold=True, sz=SZ))
     lp.append(_run(role, bold=True, sz=SZ))
     # Right: date, right-aligned
-    rp = _para(align="right")
+    rp = _para(align="right", space_before=space_before)
     rp.append(_run(date, bold=True, sz=SZ))
     _two_cells(tr, [lp], [rp])
 
@@ -374,34 +399,31 @@ def _build_skills_row(table, data: ResumeData, num_id: str) -> None:
 # uses at runtime.
 def _build_education_row(table, data: ResumeData) -> None:
     tr = _new_row(table)
-    left = []
-    right = []
+    paragraphs = []
 
     p1 = _para()
+    _add_right_tab_stop(p1)
     p1.append(_run(
-        "Master of Business Administration (STEM MBA) - University of California, Riverside",
+        "Master of Business Administration (STEM MBA) \u2013 University of California, Riverside",
         bold=True, sz=SZ,
     ))
     p1.append(_run(" GPA: 3.8", italic=True, sz=SZ))
-    left.append(p1)
+    p1.append(_tab())
+    p1.append(_run("June 2026", bold=True, sz=SZ))
+    paragraphs.append(p1)
 
     p2 = _para()
+    _add_right_tab_stop(p2)
     p2.append(_run(
-        "Bachelor of Technology, Biotechnology - Vellore Institute of Technology, India",
+        "Bachelor of Technology, Biotechnology \u2013 Vellore Institute of Technology, India",
         bold=True, sz=SZ,
     ))
     p2.append(_run(" GPA: 3.5", italic=True, sz=SZ))
-    left.append(p2)
+    p2.append(_tab())
+    p2.append(_run("Aug 2023", bold=True, sz=SZ))
+    paragraphs.append(p2)
 
-    d1 = _para(align="right")
-    d1.append(_run("June 2026", bold=True, sz=SZ))
-    right.append(d1)
-
-    d2 = _para(align="right")
-    d2.append(_run("Aug 2023", bold=True, sz=SZ))
-    right.append(d2)
-
-    _two_cells(tr, left, right)
+    _span_cell(tr, paragraphs)
 
 
 def _build_projects_row(table, data: ResumeData, num_id: str) -> None:
@@ -489,17 +511,23 @@ def generate(data: ResumeData, output_path: str) -> tuple[str, list[str]]:
     # ── Rebuild rows in order ────────────────────────────────────────────────
     _build_header_row(table, data, num_id)
     _build_contact_row(table, data, rel_ids)
-    _build_section_header(table, "PROFESSIONAL SUMMARY", space_before=180)
+    _build_section_header(table, "PROFESSIONAL SUMMARY", space_before=120)
     _build_summary_row(table, data)
-    _build_section_header(table, "SKILLS", space_before=60)
-    _build_skills_row(table, data, num_id)
-    _build_section_header(table, "EXPERIENCE", space_before=60)
-    for exp in data.experiences:
-        _build_experience_header(table, exp.company, exp.role, exp.date)
+    _build_section_header(table, "EXPERIENCE", space_before=120)
+    for index, exp in enumerate(data.experiences):
+        _build_experience_header(
+            table,
+            exp.company,
+            exp.role,
+            exp.date,
+            space_before=0 if index == 0 else 60,
+        )
         _build_bullets_row(table, exp.bullets, num_id)
-    _build_section_header(table, "EDUCATION", space_before=60)
+    _build_section_header(table, "EDUCATION", space_before=120)
     _build_education_row(table, data)
-    _build_section_header(table, "HONORS & AWARDS", space_before=60)
+    _build_section_header(table, "SKILLS", space_before=120)
+    _build_skills_row(table, data, num_id)
+    _build_section_header(table, "HONORS & AWARDS", space_before=120)
     _build_honors_row(table, data, num_id)
 
     doc.save(output_path)

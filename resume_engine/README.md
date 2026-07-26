@@ -28,9 +28,9 @@ Opens at http://localhost:8501 with four tabs:
 ## Resume engine
 
 `resume_engine/` generates Word resumes that match the table-based DOCX format
-in `new_template.docx` (blue section headers, two-column job rows, 10pt
-Calibri, 1 page). The section order is professional summary, skills,
-experience, education, and honors & awards.
+in `new_template.docx` (blue section headers, three-column job/date grid, 10pt
+Calibri, 1 page). The section order is professional summary, experience,
+education, skills, and honors & awards.
 
 - `models.py` — data classes (`ResumeData`, `ExperienceEntry`, etc.)
 - `content_rules.py` — 1-page limits (bullet counts, char caps) enforced before generation
@@ -38,6 +38,11 @@ experience, education, and honors & awards.
 - `approved_catalog.json` — approved title variants, bullet banks, skills, and JD tags
 - `custom_catalog.json` — optional user-added approved titles and skills
 - `catalog.py` — deterministic JD matching and factual-safety checks
+
+The Business Analyst family uses the approved profile captured from the
+authoritative Business Analyst reference: 18 bullets across the five
+experiences plus three focused skill lines. Beyond Key is fixed at
+`Jan 2022 – Aug 2022` for every role family.
 
 Replacing the DOCX alone is not enough for a layout change: `generator.py`
 clears and rebuilds the template table programmatically, so section order,

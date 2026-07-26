@@ -12,11 +12,10 @@ _STRAT_OPS = (
     "to improve workflows and translate data into practical business recommendations."
 )
 _BUSINESS_ANALYST = (
-    "MBA graduate from UC Riverside (GPA 3.8) with experience analyzing operational and "
-    "business data across Fortune 500 organizations, consulting engagements, and startups. "
-    "Uses SQL, Advanced Excel, Tableau, Power BI, and structured process analysis to build "
-    "trusted reporting, surface trends, and translate complex findings into clear business "
-    "recommendations."
+    "MBA graduate with experience across financial services, global operations, digital "
+    "product, and startup environments. Experienced in requirements gathering, workflow "
+    "analysis, Agile delivery, UAT, and translating stakeholder needs into process "
+    "improvements and actionable recommendations using JIRA, SQL, Excel, Tableau, and Power BI."
 )
 _PROGRAM_MGMT = (
     "MBA graduate from UC Riverside (GPA 3.8) with experience coordinating cross-functional "

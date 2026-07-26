@@ -125,6 +125,7 @@ def _select_title(
 
 def _select_bullets(
     experience: dict,
+    family: str,
     themes: set[str],
     family_tags: set[str],
 ) -> list[str]:
@@ -145,7 +146,19 @@ def _select_bullets(
 
     selected = []
     covered = set()
-    limit = experience["bullet_limit"]
+    limit = experience.get("family_bullet_limits", {}).get(
+        family, experience["bullet_limit"]
+    )
+
+    required = [
+        item for item in remaining
+        if family in experience["bullets"][item["index"]].get("families", [])
+    ]
+    for item in required[:limit]:
+        selected.append(item["text"])
+        covered.update(item["tags"] & themes)
+        remaining.remove(item)
+
     while remaining and len(selected) < limit:
         best = max(
             remaining,
@@ -182,10 +195,25 @@ def _skill_score(
 
 def _select_skills(
     catalog: dict,
+    family: str,
     normalized_text: str,
     themes: set[str],
     family_tags: set[str],
 ) -> tuple[list[SkillCategory], list[str]]:
+    family_profile = catalog.get("family_skill_profiles", {}).get(family)
+    if family_profile:
+        selected = [
+            SkillCategory(item["name"], ", ".join(item["skills"]))
+            for item in family_profile[:MAX_SKILL_CATEGORIES]
+        ]
+        matched = [
+            skill
+            for item in family_profile
+            for skill in item["skills"]
+            if _contains_phrase(normalized_text, skill)
+        ]
+        return selected, matched
+
     category_defs = {item["name"]: item for item in catalog["skill_categories"]}
     candidates: dict[str, list[dict]] = {name: [] for name in category_defs}
 
@@ -293,11 +321,11 @@ def select_catalog_content(
             company=item["company"],
             role=title,
             date=item["date"],
-            bullets=_select_bullets(item, themes, family_tags),
+            bullets=_select_bullets(item, family, themes, family_tags),
         ))
 
     skills, matched_skills = _select_skills(
-        catalog, normalized_text, themes, family_tags
+        catalog, family, normalized_text, themes, family_tags
     )
     report = {
         "matched_themes": sorted(

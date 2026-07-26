@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "keyword_groups": {
     "strategy": ["strategy", "strategic planning", "strategic initiatives", "business case", "investment decisions"],
     "operations": ["operations", "operational", "business operations", "operational excellence", "execution"],
@@ -38,6 +38,53 @@
     "Category / Market Insights": ["category_insights", "market_insights", "analytics", "reporting", "customer"],
     "General Business": ["analytics", "operations", "business_analysis", "stakeholder"]
   },
+  "family_skill_profiles": {
+    "Business Analyst": [
+      {
+        "name": "Business Analysis",
+        "skills": [
+          "Requirements Gathering",
+          "Business and Functional Requirements",
+          "User Stories",
+          "Acceptance Criteria",
+          "Backlog Support",
+          "UAT",
+          "Defect Tracking",
+          "Agile/Scrum",
+          "Process Mapping",
+          "SOPs",
+          "Root-Cause Analysis",
+          "BRD",
+          "FRD"
+        ]
+      },
+      {
+        "name": "Tools & Analytics",
+        "skills": [
+          "JIRA",
+          "Confluence",
+          "SharePoint",
+          "SQL",
+          "Power BI",
+          "Advanced Excel",
+          "Qlik Sense",
+          "Python",
+          "Snowflake",
+          "SAP Ariba"
+        ]
+      },
+      {
+        "name": "Strategy & Operations",
+        "skills": [
+          "KPI Design",
+          "Business Cases",
+          "Process Improvement",
+          "Operational Excellence",
+          "Stakeholder Management"
+        ]
+      }
+    ]
+  },
   "gap_terms": [
     {"label": "AI agent development", "aliases": ["ai agents", "ai-powered agents", "build agents"]},
     {"label": "quota management", "aliases": ["quota management", "quota setting"]},
@@ -59,6 +106,7 @@
       "company": "Hyundai Rotem",
       "date": "Mar 2026 – Jul 2026",
       "bullet_limit": 4,
+      "family_bullet_limits": {"Business Analyst": 3},
       "titles": [
         {"text": "Strategy & Operations Consultant, MBA Client Engagement", "tags": ["strategy", "operations", "consulting"], "priority": 5, "default": true},
         {"text": "Business Operations Consultant, MBA Client Engagement", "tags": ["operations", "business_analysis", "consulting"], "priority": 4},
@@ -67,10 +115,10 @@
         {"text": "Program Management Consultant, MBA Client Engagement", "tags": ["program", "operations", "stakeholder"], "priority": 3}
       ],
       "bullets": [
-        {"text": "Mapped manufacturing, inventory, testing, and material-flow processes through facility assessments, stakeholder interviews, and workflow analysis to identify operational bottlenecks.", "tags": ["operations", "process", "business_analysis"], "priority": 8},
+        {"text": "Conducted requirements gathering and process mapping across manufacturing, inventory, and material-flow operations, interviewing plant leadership and floor technicians to document current-state workflows and pinpoint root-cause bottlenecks.", "tags": ["operations", "process", "business_analysis", "stakeholder"], "priority": 8, "families": ["Business Analyst"]},
         {"text": "Quantified constraints including 145 meters of material travel, 24–32 hours of weekly idle test capacity, and space limitations affecting technician expansion from 12 to 35.", "tags": ["analytics", "operations", "reporting"], "priority": 7},
-        {"text": "Deployed Claude to synthesize stakeholder inputs, structure root-cause analysis, and evaluate four future-state operating scenarios involving FIFO workflows, dedicated testing zones, and improved shipping layouts.", "tags": ["ai", "business_analysis", "process", "strategy"], "priority": 7},
-        {"text": "Built a KPI framework and six-month implementation roadmap under $260K, projected to support 2x throughput, 2–3 weekly shipments, and payback within 18 months.", "tags": ["reporting", "program", "finance", "strategy"], "priority": 8},
+        {"text": "Evaluated future-state process options, including FIFO workflows, dedicated testing zones, and improved shipping layouts, translating floor-level constraints such as 145 meters of material travel, 24 to 32 hours of weekly idle test capacity, and space limits blocking technician growth from 12 to 35 into a data-backed business case.", "tags": ["ai", "business_analysis", "process", "strategy", "analytics"], "priority": 7, "families": ["Business Analyst"]},
+        {"text": "Built a KPI framework and authored a six-month, $260K implementation roadmap projected to double throughput, support 2 to 3 weekly shipments, and deliver 18-month payback, presenting recommendations directly to plant leadership.", "tags": ["reporting", "program", "finance", "strategy", "executive"], "priority": 8, "families": ["Business Analyst"]},
         {"text": "Led an MBA client engagement that translated facility observations and stakeholder interviews into executive recommendations and a phased operational roadmap.", "tags": ["consulting", "stakeholder", "executive", "program"], "priority": 6},
         {"text": "Compared four future-state operating scenarios and recommended FIFO workflows, dedicated testing zones, and revised shipping layouts to improve scalability.", "tags": ["strategy", "operations", "process", "consulting"], "priority": 6},
         {"text": "Developed an investment case connecting a sub-$260K implementation plan with throughput, shipment cadence, capacity, and payback targets for leadership review.", "tags": ["finance", "strategy", "executive", "analytics"], "priority": 6}
@@ -80,17 +128,21 @@
       "company": "BB Wellness",
       "date": "Feb 2025 – Sep 2025",
       "bullet_limit": 3,
+      "family_bullet_limits": {"Business Analyst": 4},
       "titles": [
         {"text": "Analyst – Strategy & Operations", "tags": ["strategy", "operations"], "priority": 5, "default": true},
         {"text": "Analyst – GTM Strategy & Operations", "tags": ["gtm", "sales_ops", "operations", "strategy"], "priority": 5},
-        {"text": "Business Analyst – Marketing & Operations", "tags": ["business_analysis", "marketing", "operations"], "priority": 4},
+        {"text": "Business Analyst – Product & Marketing Operations", "tags": ["business_analysis", "marketing", "operations", "customer"], "priority": 5},
         {"text": "Marketing Operations Analyst", "tags": ["marketing", "operations", "analytics"], "priority": 4},
         {"text": "Market Insights Analyst", "tags": ["market_insights", "category_insights", "analytics"], "priority": 4},
         {"text": "Program Operations Analyst", "tags": ["program", "operations", "stakeholder"], "priority": 3}
       ],
       "bullets": [
         {"text": "Analyzed campaign performance and competitive activity across 20+ companies, delivering positioning and growth recommendations to leadership.", "tags": ["marketing", "market_insights", "analytics", "executive"], "priority": 8},
-        {"text": "Built Excel-based KPI trackers across four marketing channels and managed social scheduling via Buffer, improving on-time posting consistency by roughly 35% and giving leadership clearer visibility into channel performance.", "tags": ["analytics", "reporting", "marketing", "operations"], "priority": 8},
+        {"text": "Supported requirements gathering between business stakeholders and UI/UX designers for a new mental health application, translating product needs into user stories in JIRA.", "tags": ["business_analysis", "stakeholder", "customer", "program"], "priority": 9, "families": ["Business Analyst"]},
+        {"text": "Documented requirements, workflows, and product decisions in Confluence to align business, design, & development teams.", "tags": ["business_analysis", "process", "stakeholder", "program"], "priority": 9, "families": ["Business Analyst"]},
+        {"text": "Built KPI trackers across four marketing channels, improving on-time posting consistency by approximately 35% and strengthening performance visibility.", "tags": ["analytics", "reporting", "marketing", "operations"], "priority": 8, "families": ["Business Analyst"]},
+        {"text": "Used Copilot and Claude to streamline competitive research and accelerate recurring business reporting and documentation.", "tags": ["ai", "automation", "analytics", "reporting"], "priority": 8, "families": ["Business Analyst"]},
         {"text": "Coordinated 10+ cross-functional initiatives and supported outreach to 15+ prospective angel investors, using Claude and ChatGPT to accelerate research and reporting.", "tags": ["program", "stakeholder", "ai", "finance"], "priority": 7},
         {"text": "Defined go-to-market problem scope through customer segmentation, competitive benchmarking, and market research, translating findings into product-positioning recommendations.", "tags": ["gtm", "market_insights", "strategy", "customer"], "priority": 7},
         {"text": "Maintained content calendars and project trackers across marketing and operations teams, clarifying ownership and improving execution across concurrent initiatives.", "tags": ["program", "marketing", "operations", "stakeholder"], "priority": 6},
@@ -102,6 +154,7 @@
       "company": "Thomson Reuters",
       "date": "Oct 2023 – Jun 2024",
       "bullet_limit": 4,
+      "family_bullet_limits": {"Business Analyst": 5},
       "titles": [
         {"text": "Analyst – Global Strategy & Operations", "tags": ["strategy", "operations"], "priority": 5, "default": true},
         {"text": "Business Analyst – Global Operations", "tags": ["business_analysis", "operations", "analytics"], "priority": 5},
@@ -111,10 +164,12 @@
         {"text": "Program Operations Analyst", "tags": ["program", "operations", "stakeholder"], "priority": 3}
       ],
       "bullets": [
-        {"text": "Analyzed Paris Olympics budget versus actuals using SQL joins and Excel across vendor, purchase-order, and expense data, identifying overspend and underspend for stakeholder action.", "tags": ["finance", "analytics", "data_tools", "stakeholder"], "priority": 8},
-        {"text": "Migrated a manual, error-prone Excel case tracker to a centralized SharePoint dashboard across three global business units, cutting version-control errors by roughly 30% and giving managers real-time visibility into case ownership and status.", "tags": ["automation", "reporting", "process", "operations"], "priority": 8},
+        {"text": "Supported Agile/Scrum backlog management and UAT activities in JIRA, partnering with cross-functional teams to clarify operational requirements and help translate them into user stories and acceptance criteria.", "tags": ["business_analysis", "program", "process", "stakeholder"], "priority": 9, "families": ["Business Analyst"]},
+        {"text": "Supported UAT by validating reports and process outputs against business requirements, documenting issues, coordinating stakeholder feedback, and assisting with corrections and retesting.", "tags": ["business_analysis", "process", "reporting", "stakeholder"], "priority": 9, "families": ["Business Analyst"]},
+        {"text": "Mapped current-state processes, developed SOPs, and translated root-cause findings into executive reports supporting process standardization, governance, and automation initiatives.", "tags": ["business_analysis", "process", "executive", "automation"], "priority": 8, "families": ["Business Analyst"]},
+        {"text": "Analyzed Paris Olympics budget versus actuals using SQL joins and Excel across vendor, purchase-order, and expense data, identifying areas of overspending and underspending for stakeholder action.", "tags": ["finance", "analytics", "data_tools", "stakeholder"], "priority": 8, "families": ["Business Analyst"]},
+        {"text": "Migrated a manual, error-prone Excel case tracker to a centralized SharePoint dashboard across three global business units, reducing version-control issues by approximately 30% and giving managers real-time visibility into case ownership and status.", "tags": ["automation", "reporting", "process", "operations"], "priority": 8, "families": ["Business Analyst"]},
         {"text": "Validated SAP Ariba transactions, reconciled financial and operational records, and partnered with finance, procurement, and operations teams to resolve workflow discrepancies.", "tags": ["finance", "operations", "process", "stakeholder"], "priority": 7},
-        {"text": "Mapped current-state processes, developed SOPs, and translated root-cause findings into executive reports supporting process standardization, governance, and automation initiatives.", "tags": ["business_analysis", "process", "executive", "automation"], "priority": 8},
         {"text": "Developed KPI dashboards and reporting frameworks that improved operational visibility and supported data-driven decisions across global teams.", "tags": ["reporting", "analytics", "operations", "executive"], "priority": 7},
         {"text": "Supported budgeting, forecasting, and variance analysis while preparing executive summaries that translated multi-source data into practical business recommendations.", "tags": ["finance", "analytics", "executive", "strategy"], "priority": 7},
         {"text": "Partnered with finance, procurement, and operations stakeholders to standardize KPIs and support quarterly business reviews and annual planning.", "tags": ["stakeholder", "reporting", "finance", "strategy"], "priority": 6},
@@ -125,6 +180,7 @@
       "company": "Goldman Sachs",
       "date": "Feb 2023 – Jun 2023",
       "bullet_limit": 3,
+      "family_bullet_limits": {"Business Analyst": 4},
       "titles": [
         {"text": "STEM Analyst – Asset & Wealth Management", "tags": ["analytics", "finance", "operations"], "priority": 5, "default": true},
         {"text": "Business Analyst – Asset & Wealth Management", "tags": ["business_analysis", "analytics", "finance"], "priority": 5},
@@ -133,19 +189,20 @@
         {"text": "Process Improvement Analyst – Asset & Wealth Management", "tags": ["process", "business_analysis", "operations"], "priority": 4}
       ],
       "bullets": [
-        {"text": "Mapped Client Revenue Operations and Institutional Reporting workflows using Excel, Qlik Sense, and JIRA, identifying manual dependencies and automation opportunities.", "tags": ["sales_ops", "business_analysis", "process", "automation"], "priority": 8},
-        {"text": "Built a refreshable Power Query workflow to clean, standardize, and merge monthly billing files with master data, cutting manual prep time by roughly 50% and improving consistency of the monthly revenue dashboard.", "tags": ["automation", "analytics", "reporting", "finance"], "priority": 8},
+        {"text": "Supported the gathering and documentation of business requirements for Client Revenue Operations and Institutional Reporting workflows using JIRA, Excel, and Qlik Sense.", "tags": ["sales_ops", "business_analysis", "process", "stakeholder"], "priority": 9, "families": ["Business Analyst"]},
+        {"text": "Analyzed current-state reporting workflows, identified manual dependencies and process gaps, and recommended automation opportunities to strengthen operational controls and reporting consistency.", "tags": ["business_analysis", "automation", "process", "operations"], "priority": 9, "families": ["Business Analyst"]},
+        {"text": "Developed operational trackers to monitor client commitments, improving workflow transparency and reporting consistency.", "tags": ["reporting", "operations", "customer", "process"], "priority": 8, "families": ["Business Analyst"]},
+        {"text": "Built a refreshable Power Query workflow to clean, standardize, and merge monthly billing files with master data, reducing manual preparation time by approximately 50% and improving the consistency of monthly revenue reporting.", "tags": ["automation", "analytics", "reporting", "finance"], "priority": 8, "families": ["Business Analyst"]},
         {"text": "Standardized commitment names using client, portfolio, and reporting frequency, improving cross-team mapping and reducing ambiguity across recurring reports.", "tags": ["process", "reporting", "stakeholder", "customer"], "priority": 7},
-        {"text": "Developed trackers for hundreds of client commitments, reporting exceptions, and follow-up actions, strengthening workflow visibility, governance, and timely execution.", "tags": ["reporting", "operations", "customer", "process"], "priority": 8},
         {"text": "Built Qlik Sense dashboards that consolidated operational data and improved visibility into business performance across Asset & Wealth Management.", "tags": ["analytics", "reporting", "finance"], "priority": 7},
-        {"text": "Analyzed manual and automated reporting workflows and proposed process improvements to strengthen operational controls and reporting consistency.", "tags": ["business_analysis", "automation", "process", "operations"], "priority": 7},
         {"text": "Coordinated reporting exceptions and follow-up actions across client revenue and institutional reporting teams, improving transparency and timely execution.", "tags": ["sales_ops", "stakeholder", "customer", "operations"], "priority": 6}
       ]
     },
     {
       "company": "Beyond Key",
-      "date": "Jun 2022 – Aug 2022",
+      "date": "Jan 2022 – Aug 2022",
       "bullet_limit": 1,
+      "family_bullet_limits": {"Business Analyst": 2},
       "titles": [
         {"text": "Data Analyst Intern", "tags": ["analytics", "data_tools"], "priority": 5, "default": true},
         {"text": "Business Intelligence Analyst Intern", "tags": ["analytics", "reporting", "business_analysis"], "priority": 4},
@@ -153,8 +210,8 @@
       ],
       "bullets": [
         {"text": "Analyzed regional medical-device sales data using SQL, Python, and Excel, and built Tableau and Power BI dashboards to track units sold and regional performance, helping teams identify underperforming markets.", "tags": ["analytics", "reporting", "market_insights", "data_tools"], "priority": 8},
-        {"text": "Retrieved, cleaned, and validated business datasets using SQL and Python, identifying trends that supported operational decisions for healthcare clients.", "tags": ["analytics", "business_analysis", "operations", "data_tools"], "priority": 7},
-        {"text": "Developed Tableau dashboards for healthcare clients, converting regional performance data into clear visual insights for business stakeholders.", "tags": ["reporting", "analytics", "executive", "data_tools"], "priority": 7}
+        {"text": "Retrieved, cleaned, and validated healthcare business datasets using SQL, Python, and Excel, identifying trends that supported operational and performance decisions.", "tags": ["analytics", "business_analysis", "operations", "data_tools"], "priority": 8, "families": ["Business Analyst"]},
+        {"text": "Developed Tableau dashboards to track units sold and regional performance, enabling stakeholders to identify performance patterns across healthcare markets.", "tags": ["reporting", "analytics", "executive", "data_tools"], "priority": 8, "families": ["Business Analyst"]}
       ]
     }
   ],
