@@ -105,6 +105,32 @@ The entire `output/` folder is git-ignored, so personal data is never committed.
 
 ---
 
+## Search troubleshooting
+
+Use **Test search setup** in the Target Companies tab before starting a full
+company search. The status values have different meanings:
+
+- `ok`: the search executed successfully.
+- `empty`: the search executed but returned no listings.
+- `blocked`: the website denied the automated request.
+- `error`: the scraper could not execute or returned invalid output.
+- `unsupported`: the saved career-site format is not supported.
+
+If the diagnostic shows `EPERM reading ...\.agents\skills\...\src\cli.ts`, the
+app was launched from a restricted or embedded automation environment. Close
+that server and start the app with the Desktop shortcut or
+`Job Application Agent.bat` from File Explorer. A normal PowerShell launch also
+works:
+
+```powershell
+.\.venv\Scripts\python.exe -m streamlit run app.py
+```
+
+This error is not a successful search with zero jobs. It means Bun was prevented
+from loading the scraper before the job-board request was made.
+
+---
+
 ## Design choices worth knowing
 
 - **Scoring reads the real JD**, not just the title — so "5+ years required" or

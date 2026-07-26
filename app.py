@@ -11,6 +11,7 @@ Tabs:
 """
 
 import json
+import shutil
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
@@ -241,15 +242,66 @@ def _is_blocked(stderr: str, stdout: str) -> bool:
                                    "blocking this request"))
 
 
+def _process_error_detail(
+    stdout: str = "", stderr: str = "", fallback: str = ""
+) -> str:
+    """Return a compact, useful subprocess failure message."""
+    detail = (stderr or stdout or fallback).strip()
+    return " ".join(detail.split())[:320]
+
+
+def validate_scraper_runtime(boards: list[str]) -> list[str]:
+    """Verify that Bun can load each selected board CLI before a large run."""
+    if not boards:
+        return []
+    bun = shutil.which("bun")
+    if not bun:
+        return [
+            "Bun was not found. Run setup.ps1 or install Bun, then restart "
+            "the app so the updated PATH is available."
+        ]
+
+    errors = []
+    for board in boards:
+        cli_dir = CLI_ROOTS[board]
+        cli_file = cli_dir / "src" / "cli.ts"
+        if not cli_file.exists():
+            errors.append(f"{board}: missing scraper file {cli_file}")
+            continue
+        try:
+            result = subprocess.run(
+                [bun, "run", "src/cli.ts", "--help"],
+                cwd=str(cli_dir),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=15,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            errors.append(f"{board}: {error}")
+            continue
+        if result.returncode != 0:
+            detail = _process_error_detail(
+                result.stdout,
+                result.stderr,
+                f"scraper exited with code {result.returncode}",
+            )
+            errors.append(f"{board}: {detail}")
+    return errors
+
+
 def scrape_board(board: str, query: str, location: str, date_posted: str,
-                 job_type: str, pages: int) -> tuple[list[dict], str]:
+                 job_type: str, pages: int) -> tuple[list[dict], str, str]:
     """
     Scrape one board across N pages.
-    Returns (jobs, status) where status is 'ok', 'blocked', 'empty', or 'error'.
+    Returns (jobs, status, detail) where status is 'ok', 'blocked', 'empty',
+    or 'error'.
     """
     cli_dir = CLI_ROOTS[board]
     jobs: list[dict] = []
     status = "empty"
+    detail = ""
     for page in range(1, pages + 1):
         cmd = ["bun", "run", "src/cli.ts", "search",
                "--query", query, "--format", "json", "--page", str(page)]
@@ -266,6 +318,11 @@ def scrape_board(board: str, query: str, location: str, date_posted: str,
             )
             if result.returncode != 0:
                 status = "blocked" if _is_blocked(result.stderr, result.stdout) else "error"
+                detail = _process_error_detail(
+                    result.stdout,
+                    result.stderr,
+                    f"scraper exited with code {result.returncode}",
+                )
                 break
             raw = result.stdout.strip()
             if not raw:
@@ -280,11 +337,17 @@ def scrape_board(board: str, query: str, location: str, date_posted: str,
             status = "ok"
         except subprocess.TimeoutExpired:
             status = "error"
+            detail = "Scraper timed out after 40 seconds."
             break
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as error:
             status = "error"
+            detail = f"Scraper returned invalid JSON: {error}"
             break
-    return jobs, status
+        except OSError as error:
+            status = "error"
+            detail = str(error)
+            break
+    return jobs, status, detail
 
 
 def _fetch_one_jd(job: dict) -> None:
@@ -308,14 +371,18 @@ def run_search(boards: list[str], queries: list[str], location: str,
     task = 0
     for board in boards:
         statuses = []
+        details = []
         kept = 0
         for q in queries:
             task += 1
             progress.progress(task / (n_tasks + 1),
                               text=f"Searching {board}: {q}…")
-            board_jobs, status = scrape_board(board, q, location, date_posted,
-                                              job_type, pages)
+            board_jobs, status, detail = scrape_board(
+                board, q, location, date_posted, job_type, pages
+            )
             statuses.append(status)
+            if detail and detail not in details:
+                details.append(detail)
             for job in board_jobs:
                 job["query"] = q
                 title = job.get("title", "")
@@ -335,7 +402,11 @@ def run_search(boards: list[str], queries: list[str], location: str,
             bs = "error"
         else:
             bs = "empty"
-        board_status[board] = {"status": bs, "count": kept}
+        board_status[board] = {
+            "status": bs,
+            "count": kept,
+            "detail": details[0] if details else "",
+        }
 
     # 2. Fetch every JD in parallel (this is what makes the score realistic).
     total = len(unique_jobs)
@@ -411,20 +482,14 @@ def _search_one_target_company(
             for future in as_completed(future_map):
                 board, role = future_map[future]
                 try:
-                    board_jobs, status = future.result()
+                    board_jobs, status, detail = future.result()
                 except Exception as error:
-                    board_jobs, status = [], "error"
-                    source_statuses.append({
-                        "source": f"{board}: {role}",
-                        "status": status,
-                        "detail": str(error)[:160],
-                    })
-                else:
-                    source_statuses.append({
-                        "source": f"{board}: {role}",
-                        "status": status,
-                        "detail": "",
-                    })
+                    board_jobs, status, detail = [], "error", str(error)[:320]
+                source_statuses.append({
+                    "source": f"{board}: {role}",
+                    "status": status,
+                    "detail": detail,
+                })
                 for job in board_jobs:
                     job["query"] = role
                     candidates.append(job)
@@ -703,6 +768,11 @@ def render_target_companies_tab() -> None:
         "sites are checked when a URL is available; selected job boards provide "
         "coverage for the rest."
     )
+    st.caption(
+        "Status meanings: ok = search executed; empty = executed with no "
+        "results; blocked = the website denied access; error = the scraper "
+        "could not run; unsupported = the career-site format is not supported."
+    )
     left, right = st.columns(2)
     with left:
         location = st.text_input(
@@ -761,43 +831,88 @@ def render_target_companies_tab() -> None:
     active_companies = [
         company for company in companies if company["active"]
     ]
-    if st.button(
-        f"Search All {len(active_companies)} Active Companies",
-        type="primary",
-        disabled=not active_companies or (
-            not boards and not use_career_sites
-        ),
-        key="run_target_search",
-    ):
-        run_id, reports = run_target_company_search(
-            active_companies,
-            boards,
-            location,
-            date_posted,
-            job_type,
-            int(pages),
-            use_career_sites,
-            int(workers),
+    test_column, search_column = st.columns([1, 3])
+    with test_column:
+        test_runtime = st.button(
+            "Test search setup",
+            disabled=not boards,
+            key="test_target_search_runtime",
         )
-        st.session_state["target_run_id"] = run_id
-        st.session_state["target_search_reports"] = reports
+    with search_column:
+        start_search = st.button(
+            f"Search All {len(active_companies)} Active Companies",
+            type="primary",
+            disabled=not active_companies or (
+                not boards and not use_career_sites
+            ),
+            key="run_target_search",
+        )
+
+    if test_runtime:
+        runtime_errors = validate_scraper_runtime(boards)
+        if runtime_errors:
+            st.error("One or more selected job-board scrapers cannot run.")
+            st.code("\n".join(runtime_errors), language=None)
+        else:
+            st.success("Bun and all selected job-board scrapers are ready.")
+
+    if start_search:
+        runtime_errors = validate_scraper_runtime(boards)
+        if runtime_errors:
+            st.error(
+                "Search did not start because the selected scraper runtime "
+                "failed its preflight check."
+            )
+            st.code("\n".join(runtime_errors), language=None)
+        else:
+            run_id, reports = run_target_company_search(
+                active_companies,
+                boards,
+                location,
+                date_posted,
+                job_type,
+                int(pages),
+                use_career_sites,
+                int(workers),
+            )
+            st.session_state["target_run_id"] = run_id
+            st.session_state["target_search_reports"] = reports
 
     reports = st.session_state.get("target_search_reports") or []
     if reports:
         jobs_found = sum(report["jobs_found"] for report in reports)
         jobs_new = sum(report["jobs_new"] for report in reports)
         searched_ok = sum(report["status"] == "ok" for report in reports)
-        st.success(
+        summary_message = (
             f"Search complete: {jobs_new} new jobs, {jobs_found} matching "
             f"jobs found, {searched_ok}/{len(reports)} companies searched "
             "successfully."
         )
+        if searched_ok == len(reports):
+            st.success(summary_message)
+        elif searched_ok:
+            st.warning(summary_message)
+        else:
+            st.error(summary_message)
         with st.expander("Company-by-company search coverage"):
+            def coverage_detail(report: dict) -> str:
+                details = []
+                for source in report["sources"]:
+                    if source["status"] in {"ok", "empty"}:
+                        continue
+                    board = source["source"].split(":", 1)[0]
+                    detail = source.get("detail") or source["status"]
+                    item = f"{board}: {detail}"
+                    if item not in details:
+                        details.append(item)
+                return "; ".join(details[:3])
+
             st.dataframe(pd.DataFrame([{
                 "Company": report["company"],
                 "Status": report["status"],
                 "Matching Jobs": report["jobs_found"],
                 "New Jobs": report["jobs_new"],
+                "Details": coverage_detail(report),
             } for report in reports]), hide_index=True, use_container_width=True)
 
     run_id = st.session_state.get("target_run_id")
@@ -967,6 +1082,14 @@ with tab_search:
             parts = [f"{icons[s['status']]} **{b}**: {labels[s['status']](s['count'])}"
                      for b, s in board_status.items()]
             st.caption("  ·  ".join(parts))
+            scraper_errors = [
+                f"{board}: {status['detail']}"
+                for board, status in board_status.items()
+                if status["status"] == "error" and status.get("detail")
+            ]
+            if scraper_errors:
+                st.error("One or more job-board scrapers could not run.")
+                st.code("\n".join(scraper_errors), language=None)
 
             if jobs:
                 n_jd = sum(1 for j in jobs if j.get("scored_on_jd"))
