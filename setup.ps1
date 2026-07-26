@@ -49,7 +49,7 @@ if (-not (Test-Path $venvPy)) {
 
 if (Test-Path $venvPy) {
     & $venvPy -m pip install --quiet --upgrade pip
-    & $venvPy -m pip install --quiet python-docx streamlit lxml pywin32 Pillow
+    & $venvPy -m pip install --quiet python-docx streamlit lxml pywin32 Pillow openpyxl
     if ($LASTEXITCODE -eq 0) {
         Write-Host "  Python packages installed into .venv." -ForegroundColor Green
     } else {

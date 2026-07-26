@@ -2,11 +2,12 @@
 Job Search Assistant — local Streamlit UI.
 
 Tabs:
-  1. Search & Tailor — scrape job boards, score each job against the profile,
+  1. Dashboard       — job-search progress with filters and visuals.
+  2. Tracker         — track application status.
+  3. Target Companies — manage priority employers and exhaustive search history.
+  4. Search & Tailor — scrape job boards, score each job against the profile,
      queue jobs, and generate tailored resumes.
-  2. Paste JD        — tailor a resume from pasted JD text or a job URL.
-  3. Dashboard       — job-search progress with filters, visuals, and encouragement.
-  4. Tracker         — track application status.
+  5. Paste JD        — tailor a resume from pasted JD text or a job URL.
 """
 
 import json
@@ -21,6 +22,27 @@ import streamlit.components.v1 as components
 
 from fit import score_job
 from tailoring import tailor_job, fetch_jd, jd_from_url
+from target_companies import (
+    canonicalize_url,
+    company_matches,
+    database_summary,
+    delete_companies,
+    fetch_career_jobs,
+    finish_search_run,
+    geography_matches,
+    import_records,
+    initialize_database,
+    job_keys,
+    list_companies,
+    record_job,
+    records_from_workbook,
+    role_match_score,
+    run_jobs,
+    save_company,
+    split_target_roles,
+    start_search_run,
+    update_company_search_status,
+)
 
 STATUSES = ["To Apply", "Applied", "Phone Screen", "Interview",
             "Final Round", "Offer", "Rejected"]
@@ -85,22 +107,54 @@ def save_plan(data: dict) -> None:
     PLAN_FILE.write_text(json.dumps(data, indent=2))
 
 
+def tracker_entry(
+    company: str,
+    role: str,
+    location: str = "",
+    url: str = "",
+    job_key: str = "",
+) -> dict | None:
+    """Find the same posting in the tracker, including legacy tracker rows."""
+    canonical_url = canonicalize_url(url)
+    company_key = company.casefold().strip()
+    role_key = role.casefold().strip()
+    location_key = location.casefold().strip()
+    for row in load_tracker():
+        if job_key and row.get("job_key") == job_key:
+            return row
+        if (
+            canonical_url
+            and canonicalize_url(row.get("url", "")) == canonical_url
+        ):
+            return row
+        if (
+            row.get("company", "").casefold().strip() == company_key
+            and row.get("role", "").casefold().strip() == role_key
+            and (
+                not location_key
+                or not row.get("location", "").strip()
+                or row.get("location", "").casefold().strip() == location_key
+            )
+        ):
+            return row
+    return None
+
+
 def tracker_has(company: str, role: str) -> bool:
-    c, r = company.lower().strip(), role.lower().strip()
-    return any(row.get("company", "").lower().strip() == c
-               and row.get("role", "").lower().strip() == r
-               for row in load_tracker())
+    return tracker_entry(company, role) is not None
 
 
 def add_application(company: str, role: str, location: str = "", url: str = "",
-                    status: str = "To Apply", notes: str = "") -> bool:
+                    status: str = "To Apply", notes: str = "",
+                    job_key: str = "") -> bool:
     """Add a job to the tracker with status 'To Apply'. Returns False if a dup."""
-    if tracker_has(company, role):
+    if tracker_entry(company, role, location, url, job_key):
         return False
     rows = load_tracker()
     rows.append({
         "company": company, "role": role, "location": location, "url": url,
-        "date_added": str(date.today()), "status": status, "notes": notes,
+        "job_key": job_key, "date_added": str(date.today()),
+        "status": status, "notes": notes,
     })
     save_tracker(rows)
     return True
@@ -170,7 +224,9 @@ def render_result(r: dict, key_prefix: str) -> None:
                         "⬇️ PDF", data=f, file_name=Path(r["pdf_path"]).name,
                         mime="application/pdf", key=f"{key_prefix}_pdf")
 
-        if tracker_has(company, role):
+        if tracker_entry(
+            company, role, r.get("location", ""), r.get("url", "")
+        ):
             st.success("✓ In tracker")
         elif st.button("➕ Add to Tracker", key=f"{key_prefix}_trk"):
             add_application(company, role, r.get("location", ""), r.get("url", ""),
@@ -309,13 +365,555 @@ def run_search(boards: list[str], queries: list[str], location: str,
     return unique_jobs, board_status
 
 
+def _search_one_target_company(
+    company: dict,
+    boards: list[str],
+    location: str,
+    date_posted: str,
+    job_type: str,
+    pages: int,
+    use_career_sites: bool,
+    workers: int,
+    run_id: int,
+) -> dict:
+    """Search one company's direct site and every saved target-role query."""
+    candidates = []
+    source_statuses = []
+
+    if use_career_sites and company.get("career_url"):
+        direct_jobs, status, detail = fetch_career_jobs(
+            company["company_name"], company["career_url"]
+        )
+        candidates.extend(direct_jobs)
+        source_statuses.append({
+            "source": "Career site", "status": status, "detail": detail,
+        })
+
+    tasks = []
+    for board in boards:
+        for role in company.get("roles", []):
+            tasks.append((board, role))
+
+    if tasks:
+        with ThreadPoolExecutor(max_workers=max(1, workers)) as executor:
+            future_map = {
+                executor.submit(
+                    scrape_board,
+                    board,
+                    f"{company['company_name']} {role}",
+                    location,
+                    date_posted,
+                    job_type,
+                    pages,
+                ): (board, role)
+                for board, role in tasks
+            }
+            for future in as_completed(future_map):
+                board, role = future_map[future]
+                try:
+                    board_jobs, status = future.result()
+                except Exception as error:
+                    board_jobs, status = [], "error"
+                    source_statuses.append({
+                        "source": f"{board}: {role}",
+                        "status": status,
+                        "detail": str(error)[:160],
+                    })
+                else:
+                    source_statuses.append({
+                        "source": f"{board}: {role}",
+                        "status": status,
+                        "detail": "",
+                    })
+                for job in board_jobs:
+                    job["query"] = role
+                    candidates.append(job)
+
+    kept = []
+    seen_fingerprints = set()
+    new_count = 0
+    for job in candidates:
+        is_direct = job.get("board") == "Career site"
+        if not is_direct and not company_matches(job.get("company", ""), company):
+            continue
+        if is_direct:
+            job["company"] = company["company_name"]
+        score, matched_role = role_match_score(
+            job.get("title", ""), company.get("roles", [])
+        )
+        if score < 45:
+            continue
+        if not geography_matches(job.get("location", ""), location):
+            continue
+        job["target_role_score"] = score
+        job["matched_role"] = matched_role
+        job["target_company"] = company["company_name"]
+        _, fingerprint = job_keys(job)
+        if fingerprint in seen_fingerprints:
+            continue
+        seen_fingerprints.add(fingerprint)
+        _, is_new = record_job(run_id, job, company, matched_role)
+        new_count += int(is_new)
+        kept.append(job)
+
+    statuses = {item["status"] for item in source_statuses}
+    if statuses & {"ok", "empty"}:
+        company_status = "ok"
+    elif "blocked" in statuses:
+        company_status = "blocked"
+    elif "unsupported" in statuses:
+        company_status = "unsupported"
+    elif not source_statuses:
+        company_status = "not_configured"
+    else:
+        company_status = "error"
+    update_company_search_status(company["id"], company_status, len(kept))
+    return {
+        "company": company["company_name"],
+        "status": company_status,
+        "jobs_found": len(kept),
+        "jobs_new": new_count,
+        "sources": source_statuses,
+    }
+
+
+def run_target_company_search(
+    companies: list[dict],
+    boards: list[str],
+    location: str,
+    date_posted: str,
+    job_type: str,
+    pages: int,
+    use_career_sites: bool,
+    workers: int,
+) -> tuple[int, list[dict]]:
+    """Run the exhaustive target-company search with persistent history."""
+    sources = (["Career sites"] if use_career_sites else []) + boards
+    run_id = start_search_run(
+        location, date_posted, sources, len(companies)
+    )
+    reports = []
+    progress = st.progress(0.0, text="Preparing target-company search...")
+    for index, company in enumerate(companies, start=1):
+        progress.progress(
+            (index - 1) / max(1, len(companies)),
+            text=(
+                f"Searching {index}/{len(companies)}: "
+                f"{company['company_name']}"
+            ),
+        )
+        reports.append(_search_one_target_company(
+            company, boards, location, date_posted, job_type, pages,
+            use_career_sites, workers, run_id,
+        ))
+    progress.progress(1.0, text="Target-company search complete.")
+    progress.empty()
+
+    succeeded = sum(report["status"] == "ok" for report in reports)
+    failed = len(reports) - succeeded
+    jobs_found = sum(report["jobs_found"] for report in reports)
+    jobs_new = sum(report["jobs_new"] for report in reports)
+    finish_search_run(
+        run_id, succeeded, failed, jobs_found, jobs_new
+    )
+    return run_id, reports
+
+
+def render_target_companies_tab() -> None:
+    """Render catalog management, Excel import, brute-force search, and history."""
+    initialize_database()
+    st.header("Target Companies")
+
+    summary = database_summary()
+    metrics = st.columns(4)
+    metrics[0].metric(
+        "Companies",
+        summary["companies"],
+        f"{summary['active_companies']} active",
+    )
+    metrics[1].metric("Target roles", summary["roles"])
+    metrics[2].metric("Career URLs", summary["career_urls"])
+    metrics[3].metric("Jobs remembered", summary["seen_jobs"])
+
+    with st.expander("Import or update from Excel"):
+        uploaded = st.file_uploader(
+            "Target-company workbook",
+            type=["xlsx"],
+            key="target_company_upload",
+            help=(
+                "Every sheet is read. Existing companies and roles are merged; "
+                "reimporting the same workbook does not create duplicates."
+            ),
+        )
+        if st.button(
+            "Import workbook",
+            disabled=uploaded is None,
+            key="import_target_workbook",
+        ):
+            try:
+                records = records_from_workbook(uploaded.getvalue())
+                result = import_records(records)
+                st.session_state["target_import_result"] = result
+                st.success(
+                    f"Read {len(records)} rows. Added "
+                    f"{result['companies_added']} companies and "
+                    f"{result['roles_added']} roles; merged "
+                    f"{result['duplicates_merged']} existing company rows."
+                )
+            except Exception as error:
+                st.error(f"Import failed: {error}")
+        result = st.session_state.get("target_import_result") or {}
+        conflicts = result.get("career_url_conflicts") or []
+        if conflicts:
+            st.warning(
+                "Some imported career URLs differed from saved URLs. Existing "
+                "URLs were preserved so they can be reviewed before replacement."
+            )
+            st.dataframe(pd.DataFrame(conflicts), hide_index=True)
+
+    with st.expander("Add a target company"):
+        left, right = st.columns(2)
+        with left:
+            new_company = st.text_input(
+                "Company name", key="new_target_company"
+            )
+            new_roles = st.text_area(
+                "Target roles",
+                key="new_target_roles",
+                placeholder="Business Analyst, Strategy & Operations Analyst",
+            )
+            new_location = st.text_input(
+                "Preferred location", key="new_target_location"
+            )
+        with right:
+            new_career_url = st.text_input(
+                "Career website URL", key="new_target_career_url"
+            )
+            new_category = st.text_input(
+                "Category", key="new_target_category"
+            )
+            new_notes = st.text_area("Notes", key="new_target_notes")
+        if st.button("Add company", key="add_target_company"):
+            if not new_company.strip():
+                st.warning("Enter a company name.")
+            elif not split_target_roles(new_roles):
+                st.warning("Enter at least one target role.")
+            else:
+                save_company(
+                    new_company,
+                    split_target_roles(new_roles),
+                    location=new_location,
+                    career_url=new_career_url,
+                    category=new_category,
+                    notes=new_notes,
+                )
+                st.success("Target company saved.")
+                st.rerun()
+
+    companies = list_companies()
+    st.subheader("Company List")
+    st.caption(
+        "Edit values directly, then save. Deactivating a company keeps its "
+        "history but excludes it from brute-force searches."
+    )
+    company_df = pd.DataFrame([{
+        "_ID": company["id"],
+        "Active": company["active"],
+        "Company": company["company_name"],
+        "Target Roles": ", ".join(company["roles"]),
+        "Location": company["location"],
+        "Career URL": company["career_url"],
+        "Category": company["category"],
+        "Notes": company["notes"],
+        "Source Tabs": ", ".join(company["source_tabs"]),
+        "Last Search": company["last_searched_at"],
+        "Search Status": company["last_search_status"],
+        "Delete": False,
+    } for company in companies])
+    edited = st.data_editor(
+        company_df,
+        hide_index=True,
+        use_container_width=True,
+        height=480,
+        column_config={
+            "_ID": None,
+            "Active": st.column_config.CheckboxColumn("Active", width="small"),
+            "Company": st.column_config.TextColumn("Company", width="medium"),
+            "Target Roles": st.column_config.TextColumn(
+                "Target Roles", width="large"
+            ),
+            "Location": st.column_config.TextColumn("Location", width="medium"),
+            "Career URL": st.column_config.LinkColumn(
+                "Career URL", width="large"
+            ),
+            "Category": st.column_config.TextColumn("Category", width="medium"),
+            "Notes": st.column_config.TextColumn("Notes", width="large"),
+            "Source Tabs": st.column_config.TextColumn(
+                "Imported From", width="small"
+            ),
+            "Last Search": st.column_config.TextColumn(
+                "Last Search", width="small"
+            ),
+            "Search Status": st.column_config.TextColumn(
+                "Status", width="small"
+            ),
+            "Delete": st.column_config.CheckboxColumn(
+                "Delete", width="small"
+            ),
+        },
+        disabled=["Source Tabs", "Last Search", "Search Status"],
+        key="target_company_editor",
+    )
+
+    def cell_text(value) -> str:
+        return "" if pd.isna(value) else str(value).strip()
+
+    if st.button("Save company changes", type="primary"):
+        delete_ids = []
+        errors = []
+        for _, row in edited.iterrows():
+            company_id = int(row["_ID"])
+            if bool(row["Delete"]):
+                delete_ids.append(company_id)
+                continue
+            try:
+                save_company(
+                    cell_text(row["Company"]),
+                    split_target_roles(cell_text(row["Target Roles"])),
+                    location=cell_text(row["Location"]),
+                    career_url=cell_text(row["Career URL"]),
+                    category=cell_text(row["Category"]),
+                    notes=cell_text(row["Notes"]),
+                    active=bool(row["Active"]),
+                    company_id=company_id,
+                )
+            except Exception as error:
+                errors.append(f"{row['Company']}: {error}")
+        delete_companies(delete_ids)
+        if errors:
+            st.error("Some rows could not be saved: " + "; ".join(errors))
+        else:
+            st.success("Company list updated.")
+            st.rerun()
+
+    st.divider()
+    st.subheader("Brute-Force Search")
+    st.caption(
+        "Searches every active target company and every saved role. Career "
+        "sites are checked when a URL is available; selected job boards provide "
+        "coverage for the rest."
+    )
+    left, right = st.columns(2)
+    with left:
+        location = st.text_input(
+            "Geographic scope",
+            value="California, USA",
+            key="target_location",
+            help="Leave blank to include every location.",
+        )
+        date_posted = st.selectbox(
+            "Date posted",
+            ["any", "day", "week", "month"],
+            format_func=lambda value: {
+                "any": "Any time",
+                "day": "Past 24h",
+                "week": "Past week",
+                "month": "Past month",
+            }[value],
+            key="target_date_posted",
+        )
+        job_type = st.selectbox(
+            "Job type",
+            ["any", "fulltime", "internship", "contract"],
+            format_func=lambda value: (
+                value.title() if value != "any" else "Any"
+            ),
+            key="target_job_type",
+        )
+    with right:
+        boards = st.multiselect(
+            "Supplementary job boards",
+            ALL_BOARDS,
+            default=ALL_BOARDS,
+            key="target_boards",
+        )
+        pages = st.number_input(
+            "Pages per role and board",
+            min_value=1,
+            max_value=5,
+            value=1,
+            key="target_pages",
+        )
+        workers = st.number_input(
+            "Concurrent searches",
+            min_value=1,
+            max_value=6,
+            value=3,
+            key="target_workers",
+            help="Lower this if a job board begins rate-limiting searches.",
+        )
+        use_career_sites = st.checkbox(
+            "Search saved career websites",
+            value=True,
+            key="use_target_career_sites",
+        )
+
+    active_companies = [
+        company for company in companies if company["active"]
+    ]
+    if st.button(
+        f"Search All {len(active_companies)} Active Companies",
+        type="primary",
+        disabled=not active_companies or (
+            not boards and not use_career_sites
+        ),
+        key="run_target_search",
+    ):
+        run_id, reports = run_target_company_search(
+            active_companies,
+            boards,
+            location,
+            date_posted,
+            job_type,
+            int(pages),
+            use_career_sites,
+            int(workers),
+        )
+        st.session_state["target_run_id"] = run_id
+        st.session_state["target_search_reports"] = reports
+
+    reports = st.session_state.get("target_search_reports") or []
+    if reports:
+        jobs_found = sum(report["jobs_found"] for report in reports)
+        jobs_new = sum(report["jobs_new"] for report in reports)
+        searched_ok = sum(report["status"] == "ok" for report in reports)
+        st.success(
+            f"Search complete: {jobs_new} new jobs, {jobs_found} matching "
+            f"jobs found, {searched_ok}/{len(reports)} companies searched "
+            "successfully."
+        )
+        with st.expander("Company-by-company search coverage"):
+            st.dataframe(pd.DataFrame([{
+                "Company": report["company"],
+                "Status": report["status"],
+                "Matching Jobs": report["jobs_found"],
+                "New Jobs": report["jobs_new"],
+            } for report in reports]), hide_index=True, use_container_width=True)
+
+    run_id = st.session_state.get("target_run_id")
+    if not run_id:
+        return
+    new_only = st.checkbox(
+        "Show only jobs discovered for the first time in this search",
+        value=True,
+        key="target_new_only",
+    )
+    jobs = run_jobs(run_id, new_only=new_only)
+    if not jobs:
+        st.info(
+            "No jobs match this view. Untick the new-only filter to review "
+            "previously seen jobs found again in this search."
+        )
+        return
+
+    result_rows = []
+    for job in jobs:
+        tracker_row = tracker_entry(
+            job["company_name"],
+            job["title"],
+            job["location"],
+            job["canonical_url"],
+            job["job_key"],
+        )
+        result_rows.append({
+            "Add": False,
+            "Company": job["company_name"],
+            "Title": job["title"],
+            "Location": job["location"],
+            "Matched Target Role": job["matched_role"],
+            "Application": (
+                tracker_row.get("status", "In tracker")
+                if tracker_row else "Not tracked"
+            ),
+            "Source": ", ".join(json.loads(job["sources_json"] or "[]")),
+            "First Seen": job["first_seen"],
+            "URL": job["canonical_url"],
+        })
+    results_df = pd.DataFrame(result_rows)
+    edited_results = st.data_editor(
+        results_df,
+        hide_index=True,
+        use_container_width=True,
+        height=460,
+        column_config={
+            "Add": st.column_config.CheckboxColumn(
+                "Add to Tracker", width="small"
+            ),
+            "Company": st.column_config.TextColumn("Company", width="small"),
+            "Title": st.column_config.TextColumn("Title", width="medium"),
+            "Location": st.column_config.TextColumn("Location", width="small"),
+            "Matched Target Role": st.column_config.TextColumn(
+                "Matched Role", width="medium"
+            ),
+            "Application": st.column_config.TextColumn(
+                "Application", width="small"
+            ),
+            "Source": st.column_config.TextColumn("Source", width="small"),
+            "First Seen": st.column_config.TextColumn(
+                "First Seen", width="small"
+            ),
+            "URL": st.column_config.LinkColumn(
+                "Job Posting", width="large", display_text="Open"
+            ),
+        },
+        disabled=[
+            "Company", "Title", "Location", "Matched Target Role",
+            "Application", "Source", "First Seen", "URL",
+        ],
+        key="target_job_results",
+    )
+    selected = edited_results.index[edited_results["Add"]].tolist()
+    if st.button(
+        f"Add Selected to Tracker ({len(selected)})",
+        disabled=not selected,
+        key="add_target_jobs_to_tracker",
+    ):
+        added = 0
+        for index in selected:
+            job = jobs[index]
+            added += int(add_application(
+                job["company_name"],
+                job["title"],
+                job["location"],
+                job["canonical_url"],
+                status="To Apply",
+                notes=(
+                    "Target-company search; matched "
+                    f"{job['matched_role']}"
+                ),
+                job_key=job["job_key"],
+            ))
+        st.success(f"Added {added} new job(s) to the tracker.")
+        st.rerun()
+
+
 # ════════════════════════════════════════════════════════════════════════════
 st.set_page_config(page_title="Job Search Assistant", page_icon="💼", layout="wide")
 st.title("💼 Job Search Assistant")
 st.caption("Shrujal Agarwal — local workflow tool")
 
-tab_dashboard, tab_tracker, tab_search, tab_paste = st.tabs(
-    ["📊 Dashboard", "🗂️ Tracker", "🔍 Search & Tailor", "📝 Paste JD"])
+tab_dashboard, tab_tracker, tab_targets, tab_search, tab_paste = st.tabs(
+    [
+        "📊 Dashboard",
+        "🗂️ Tracker",
+        "🎯 Target Companies",
+        "🔍 Search & Tailor",
+        "📝 Paste JD",
+    ]
+)
+
+with tab_targets:
+    render_target_companies_tab()
 
 # ════════════════════════════════════════════════════════════════════════════
 # TAB 1 — SEARCH & TAILOR
@@ -718,13 +1316,14 @@ with tab_tracker:
             t_notes = st.text_input("Notes", key="t_notes")
         if st.button("Add Entry"):
             if t_company and t_role:
-                rows.append({
-                    "company": t_company, "role": t_role, "location": t_location,
-                    "url": t_url, "date_added": str(date.today()),
-                    "status": t_status, "notes": t_notes,
-                })
-                save_tracker(rows)
-                st.success("Added.")
+                added = add_application(
+                    t_company, t_role, t_location, t_url,
+                    status=t_status, notes=t_notes,
+                )
+                if added:
+                    st.success("Added.")
+                else:
+                    st.info("That job is already in the tracker.")
                 st.rerun()
 
     if not rows:

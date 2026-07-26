@@ -21,6 +21,10 @@ your computer.
   chart, applications over time).
 - **🗂️ Tracker** — an editable table of every application, with status, notes, and
   CSV export. Saved to disk so it persists across restarts.
+- **🎯 Target Companies** — manage the priority-company catalog, merge updates
+  from Excel, add career-site links, and run a thorough search across every
+  active company and its broad target-role matches. Previously seen and applied
+  jobs are remembered so they are not repeatedly presented as new.
 - **🔍 Search & Tailor** — search LinkedIn (and Indeed/Glassdoor when reachable) for
   several target roles at once. Each posting's full description is read and scored
   against the candidate profile, then flagged for experience level and visa
@@ -71,9 +75,11 @@ To stop the app, close that console window.
 
 | File / folder | Role |
 |---------------|------|
-| `app.py` | The Streamlit UI — all four tabs and the workflow glue. |
+| `app.py` | The Streamlit UI — all five tabs and the workflow glue. |
 | `fit.py` | Scores a job 0–100 against the profile: role family, target companies, location, seniority, years-of-experience, and sponsorship / ITAR / citizenship blockers. |
 | `tailoring.py` | Fetches a job's full description, detects the role family, and generates the tailored DOCX + PDF into the output folder. |
+| `target_companies.py` | Imports and merges target companies, stores search history in SQLite, matches broad role families, deduplicates jobs, and reads supported career sites. |
+| `data/target_companies_seed.json` | The initial 97-company catalog built from the two uploaded Excel tabs. |
 | `resume_engine/` | Builds the Word résumé from structured data. `profile.py` holds the base résumé and per-role-family variants; `generator.py` writes the DOCX; `content_rules.py` keeps it to one page. |
 | `.agents/skills/*/cli` | The TypeScript (Bun) scrapers for LinkedIn, Indeed, Glassdoor. |
 | `setup.ps1` | One-command environment setup + shortcut creation. |
@@ -92,6 +98,7 @@ are reported as gaps instead of being copied into the resume.
 
 - **Application tracker:** `output/tracker.json`
 - **Today's plan:** `output/daily_plan.json`
+- **Target companies and seen-job history:** `output/target_companies.sqlite3`
 - **Generated resumes:** `Downloads/2026/…`
 
 The entire `output/` folder is git-ignored, so personal data is never committed.
@@ -106,6 +113,10 @@ The entire `output/` folder is git-ignored, so personal data is never committed.
   because the candidate is an F1 student who needs sponsorship.
 - **Indeed & Glassdoor** sit behind Cloudflare and often refuse automated requests;
   the app degrades gracefully and leans on LinkedIn (which exposes a guest API).
+- **Direct career sites are explicit about coverage:** Greenhouse, Lever, and
+  SmartRecruiters use their public posting APIs; other career pages use a
+  best-effort link reader and are marked unsupported or failed when their jobs
+  cannot be read.
 - **A virtual environment (`.venv`)** guarantees the launcher always uses the one
   Python that has the dependencies, avoiding "which Python?" errors on Windows.
 

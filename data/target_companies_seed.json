@@ -1,0 +1,1727 @@
+[
+  {
+    "company_name": "Accenture",
+    "aliases": [
+      "Accenture"
+    ],
+    "location": "San Francisco, San Jose",
+    "roles": [
+      "Management Analyst",
+      "Technology Consulting Analyst"
+    ],
+    "career_url": "",
+    "category": "Consulting, Professional Services, and IT/Data Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Adobe",
+    "aliases": [
+      "Adobe"
+    ],
+    "location": "San Jose, San Francisco",
+    "roles": [
+      "Data Analyst",
+      "Financial Analyst",
+      "Marketing Analyst"
+    ],
+    "career_url": "",
+    "category": "Mega-Cap Technology and Cloud Infrastructure",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Affirm",
+    "aliases": [
+      "Affirm"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Credit Risk Analyst",
+      "Data Analyst",
+      "Financial Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Financial Technology and Financial Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Airbnb",
+    "aliases": [
+      "Airbnb"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Business Operations Analyst",
+      "Data Analyst",
+      "Strategic Finance Analyst"
+    ],
+    "career_url": "",
+    "category": "Hardware, Consumer Tech, Retail, and Autonomous Systems",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Amazon / AWS",
+    "aliases": [
+      "Amazon / AWS"
+    ],
+    "location": "San Francisco, Palo Alto, Sunnyvale",
+    "roles": [
+      "Business Analyst",
+      "Data Analyst",
+      "Financial Analyst"
+    ],
+    "career_url": "",
+    "category": "Mega-Cap Technology and Cloud Infrastructure",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Apple",
+    "aliases": [
+      "Apple"
+    ],
+    "location": "Cupertino, Sunnyvale",
+    "roles": [
+      "Data Analyst",
+      "Operations Analyst",
+      "Supply Chain Analyst"
+    ],
+    "career_url": "",
+    "category": "Mega-Cap Technology and Cloud Infrastructure",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Asana",
+    "aliases": [
+      "Asana"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Data Analyst",
+      "Product Operations Analyst",
+      "Sales Ops Analyst"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Atlassian",
+    "aliases": [
+      "Atlassian"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Business Analyst",
+      "Product Analyst",
+      "Strategic Finance Analyst"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Aurora Innovation",
+    "aliases": [
+      "Aurora Innovation"
+    ],
+    "location": "Mountain View",
+    "roles": [
+      "Business Operations Analyst",
+      "Data Infrastructure Analyst"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Bain & Company",
+    "aliases": [
+      "Bain & Company"
+    ],
+    "location": "San Francisco, Silicon Valley",
+    "roles": [
+      "Associate Consultant",
+      "Data Analyst"
+    ],
+    "career_url": "",
+    "category": "Consulting, Professional Services, and IT/Data Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Bio-Rad Laboratories",
+    "aliases": [
+      "Bio-Rad Laboratories"
+    ],
+    "location": "Hercules",
+    "roles": [
+      "Financial Analyst",
+      "Supply Chain Data Analyst"
+    ],
+    "career_url": "",
+    "category": "Healthcare, Biotechnology, and Life Sciences",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Bitus Labs",
+    "aliases": [
+      "Bitus Labs"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Business Intelligence Analyst",
+      "Game Analytics Data Analyst"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Block (Square)",
+    "aliases": [
+      "Block (Square)"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Business Operations Analyst",
+      "Data Analyst",
+      "Strategic Finance Analyst"
+    ],
+    "career_url": "",
+    "category": "Financial Technology and Financial Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Boston Consulting Group",
+    "aliases": [
+      "Boston Consulting Group"
+    ],
+    "location": "San Francisco, Silicon Valley",
+    "roles": [
+      "Business Analyst",
+      "Data & Analytics Consultant"
+    ],
+    "career_url": "",
+    "category": "Consulting, Professional Services, and IT/Data Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Box",
+    "aliases": [
+      "Box"
+    ],
+    "location": "Redwood City",
+    "roles": [
+      "Business Analyst",
+      "Data Analyst",
+      "Revenue Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Brex",
+    "aliases": [
+      "Brex"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Credit Risk Analyst",
+      "Data Analyst",
+      "Financial Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Financial Technology and Financial Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Charles Schwab",
+    "aliases": [
+      "Charles Schwab"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Data Analyst",
+      "Financial Analyst",
+      "Portfolio Analyst"
+    ],
+    "career_url": "",
+    "category": "Financial Technology and Financial Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Checkr",
+    "aliases": [
+      "Checkr"
+    ],
+    "location": "San Francisco | San Francisco, CA (Hybrid)",
+    "roles": [
+      "Data Analyst",
+      "HRIS Analyst",
+      "Revenue Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups | YC 2024 Breakthrough Company",
+    "source_tabs": [
+      "Bay Area Companies",
+      "Y-Combinator"
+    ],
+    "notes": "H-1B Sponsorship (Proven DOL LCA History)"
+  },
+  {
+    "company_name": "Chime",
+    "aliases": [
+      "Chime"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Credit Risk Analyst",
+      "Data Analyst",
+      "Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Financial Technology and Financial Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Cisco Systems",
+    "aliases": [
+      "Cisco Systems"
+    ],
+    "location": "San Jose",
+    "roles": [
+      "Business Operations Analyst",
+      "Financial Analyst",
+      "Supply Chain Analyst"
+    ],
+    "career_url": "",
+    "category": "Mega-Cap Technology and Cloud Infrastructure",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Clera",
+    "aliases": [
+      "Clera"
+    ],
+    "location": "San Francisco | San Francisco, CA (In-Person)",
+    "roles": [
+      "Applied AI",
+      "Applied AI Analyst",
+      "Product Operations",
+      "Product Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups | YC Backed / Early-Stage AI",
+    "source_tabs": [
+      "Bay Area Companies",
+      "Y-Combinator"
+    ],
+    "notes": "Full US Visa Sponsorship & Relocation Support"
+  },
+  {
+    "company_name": "Coinbase",
+    "aliases": [
+      "Coinbase"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Data Analyst",
+      "Financial Analyst",
+      "Risk Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Financial Technology and Financial Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Copart",
+    "aliases": [
+      "Copart"
+    ],
+    "location": "Vallejo",
+    "roles": [
+      "Business Analyst",
+      "Operations Analyst",
+      "Systems Analyst"
+    ],
+    "career_url": "",
+    "category": "Hardware, Consumer Tech, Retail, and Autonomous Systems",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Databricks",
+    "aliases": [
+      "Databricks"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Business Operations Analyst",
+      "Data Analyst",
+      "RevOps Analyst"
+    ],
+    "career_url": "",
+    "category": "Mega-Cap Technology and Cloud Infrastructure",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "David Joseph & Company",
+    "aliases": [
+      "David Joseph & Company",
+      "David Joseph & Co."
+    ],
+    "location": "San Francisco | San Francisco, CA (5 Days Onsite)",
+    "roles": [
+      "Growth Lead Analyst",
+      "Product Analyst",
+      "Strategic Analyst",
+      "Strategic Finance"
+    ],
+    "career_url": "",
+    "category": "Consulting, Professional Services, and IT/Data Services | Mid-Market Tech & Advisory",
+    "source_tabs": [
+      "Bay Area Companies",
+      "Y-Combinator"
+    ],
+    "notes": "H-1B, O-1, STEM OPT Supported"
+  },
+  {
+    "company_name": "Dexcom",
+    "aliases": [
+      "Dexcom"
+    ],
+    "location": "Bay Area Regional Office",
+    "roles": [
+      "Commercial Operations Analyst",
+      "Data Analyst"
+    ],
+    "career_url": "",
+    "category": "Healthcare, Biotechnology, and Life Sciences",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Dharwin Business Solutions",
+    "aliases": [
+      "Dharwin Business Solutions"
+    ],
+    "location": "Remote (Bay Area Hub)",
+    "roles": [
+      "Business Systems Analyst",
+      "Entry-Level Data Analyst"
+    ],
+    "career_url": "",
+    "category": "Consulting, Professional Services, and IT/Data Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Dolby Laboratories",
+    "aliases": [
+      "Dolby Laboratories"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Data Analyst",
+      "Financial Analyst",
+      "Licensing Analyst"
+    ],
+    "career_url": "",
+    "category": "Hardware, Consumer Tech, Retail, and Autonomous Systems",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "DoorDash",
+    "aliases": [
+      "DoorDash"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Data Analyst",
+      "Logistics Operations Analyst",
+      "Strategy & Ops Analyst"
+    ],
+    "career_url": "",
+    "category": "Hardware, Consumer Tech, Retail, and Autonomous Systems",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Doximity",
+    "aliases": [
+      "Doximity",
+      "Doximity Inc."
+    ],
+    "location": "San Francisco | San Francisco, CA (Hybrid)",
+    "roles": [
+      "Data Analyst",
+      "Healthcare Analytics Analyst",
+      "Senior Data Analyst",
+      "Sr Data Analyst"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups | Public Enterprise (SF HQ)",
+    "source_tabs": [
+      "Bay Area Companies",
+      "Y-Combinator"
+    ],
+    "notes": "H-1B Sponsorship (40+ LCAs Filed FY21–25)"
+  },
+  {
+    "company_name": "Dropbox",
+    "aliases": [
+      "Dropbox"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Business Operations Analyst",
+      "Product Analyst",
+      "Strategic Finance Analyst"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Exelixis",
+    "aliases": [
+      "Exelixis"
+    ],
+    "location": "Alameda",
+    "roles": [
+      "Financial Analyst",
+      "Supply Chain Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Healthcare, Biotechnology, and Life Sciences",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Firstbase.io",
+    "aliases": [
+      "Firstbase.io"
+    ],
+    "location": "San Francisco, CA / Remote (US)",
+    "roles": [
+      "Analyst",
+      "Business Operations Manager"
+    ],
+    "career_url": "",
+    "category": "YC W21 / Company OS Platform",
+    "source_tabs": [
+      "Y-Combinator"
+    ],
+    "notes": "Case-by-Case Sponsorship (OPT/STEM OPT Priority)"
+  },
+  {
+    "company_name": "Flagright",
+    "aliases": [
+      "Flagright"
+    ],
+    "location": "Santa Clara, CA (In-Person)",
+    "roles": [
+      "Product Operations Specialist"
+    ],
+    "career_url": "",
+    "category": "YC W22 / AML Compliance",
+    "source_tabs": [
+      "Y-Combinator"
+    ],
+    "notes": "NO Visa Sponsorship (US Auth Required)"
+  },
+  {
+    "company_name": "Forage",
+    "aliases": [
+      "Forage"
+    ],
+    "location": "San Francisco, CA (Onsite)",
+    "roles": [
+      "Financial Analyst"
+    ],
+    "career_url": "",
+    "category": "YC S21 / Fintech Infrastructure",
+    "source_tabs": [
+      "Y-Combinator"
+    ],
+    "notes": "NO Visa Sponsorship (US Auth Required)"
+  },
+  {
+    "company_name": "Franklin Templeton",
+    "aliases": [
+      "Franklin Templeton"
+    ],
+    "location": "San Mateo",
+    "roles": [
+      "Business Analyst",
+      "Investment Analyst",
+      "Risk Analyst"
+    ],
+    "career_url": "",
+    "category": "Financial Technology and Financial Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Gap Inc.",
+    "aliases": [
+      "Gap Inc."
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Financial Analyst",
+      "Inventory Data Analyst",
+      "Supply Chain Analyst"
+    ],
+    "career_url": "",
+    "category": "Hardware, Consumer Tech, Retail, and Autonomous Systems",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Genentech (Roche)",
+    "aliases": [
+      "Genentech (Roche)"
+    ],
+    "location": "South San Francisco",
+    "roles": [
+      "Biostatistical Analyst",
+      "Business Operations Analyst",
+      "Data Analyst"
+    ],
+    "career_url": "",
+    "category": "Healthcare, Biotechnology, and Life Sciences",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Gilead Sciences",
+    "aliases": [
+      "Gilead Sciences"
+    ],
+    "location": "Foster City",
+    "roles": [
+      "Clinical Data Analyst",
+      "Commercial Operations Analyst",
+      "Financial Analyst"
+    ],
+    "career_url": "",
+    "category": "Healthcare, Biotechnology, and Life Sciences",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Google",
+    "aliases": [
+      "Google"
+    ],
+    "location": "Mountain View, Sunnyvale, San Francisco",
+    "roles": [
+      "Business Analyst",
+      "Data Analyst",
+      "Technical Solutions Consultant"
+    ],
+    "career_url": "",
+    "category": "Mega-Cap Technology and Cloud Infrastructure",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Guardant Health",
+    "aliases": [
+      "Guardant Health"
+    ],
+    "location": "Redwood City",
+    "roles": [
+      "Bioinformatics Data Analyst",
+      "Business Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Healthcare, Biotechnology, and Life Sciences",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Hive",
+    "aliases": [
+      "Hive"
+    ],
+    "location": "San Francisco | San Francisco, CA (Onsite)",
+    "roles": [
+      "BA Models",
+      "Business Analyst",
+      "Data Ops",
+      "Data Operations Analyst",
+      "Media Analyst",
+      "Sales Ops"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups | Venture-Backed AI / Analytics",
+    "source_tabs": [
+      "Bay Area Companies",
+      "Y-Combinator"
+    ],
+    "notes": "STEM OPT / H-1B Eligible Entry Roles"
+  },
+  {
+    "company_name": "Illumina",
+    "aliases": [
+      "Illumina"
+    ],
+    "location": "Foster City",
+    "roles": [
+      "Clinical Data Analyst",
+      "Commercial Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Healthcare, Biotechnology, and Life Sciences",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Instacart",
+    "aliases": [
+      "Instacart"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Catalog Data Analyst",
+      "Growth Analytics Analyst",
+      "Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Hardware, Consumer Tech, Retail, and Autonomous Systems",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Instawork",
+    "aliases": [
+      "Instawork"
+    ],
+    "location": "San Francisco | San Francisco, CA (5 Days Onsite)",
+    "roles": [
+      "Business Analyst",
+      "Operations Analyst",
+      "Robotics Data Ops Analyst"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups | YC Backed / Benchmark, Spark",
+    "source_tabs": [
+      "Bay Area Companies",
+      "Y-Combinator"
+    ],
+    "notes": "Sponsors Visa / STEM OPT Friendly"
+  },
+  {
+    "company_name": "Intel Corporation",
+    "aliases": [
+      "Intel Corporation"
+    ],
+    "location": "Santa Clara",
+    "roles": [
+      "Data Analyst",
+      "Financial Analyst",
+      "Supply Chain Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Hardware, Consumer Tech, Retail, and Autonomous Systems",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Intuit",
+    "aliases": [
+      "Intuit"
+    ],
+    "location": "Mountain View",
+    "roles": [
+      "Data Analyst",
+      "Product Analyst",
+      "Strategic Finance Analyst"
+    ],
+    "career_url": "",
+    "category": "Mega-Cap Technology and Cloud Infrastructure",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Intuitive Surgical",
+    "aliases": [
+      "Intuitive Surgical"
+    ],
+    "location": "Sunnyvale",
+    "roles": [
+      "Commercial Analyst",
+      "Operations Analyst",
+      "Systems Data Analyst"
+    ],
+    "career_url": "",
+    "category": "Healthcare, Biotechnology, and Life Sciences",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Invitae",
+    "aliases": [
+      "Invitae"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Clinical Data Analyst",
+      "Financial Analyst"
+    ],
+    "career_url": "",
+    "category": "Healthcare, Biotechnology, and Life Sciences",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "IXL Learning",
+    "aliases": [
+      "IXL Learning"
+    ],
+    "location": "San Mateo",
+    "roles": [
+      "Digital Marketing Analyst",
+      "Educational Data Analyst"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Kaiser Permanente",
+    "aliases": [
+      "Kaiser Permanente"
+    ],
+    "location": "Oakland, San Francisco, Pleasanton",
+    "roles": [
+      "Business Operations Analyst",
+      "Financial Analyst",
+      "Healthcare Data Analyst"
+    ],
+    "career_url": "",
+    "category": "Healthcare, Biotechnology, and Life Sciences",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Legrand Group",
+    "aliases": [
+      "Legrand Group"
+    ],
+    "location": "Union City",
+    "roles": [
+      "Financial & Cost Analyst",
+      "Operations Data Analyst"
+    ],
+    "career_url": "",
+    "category": "Consulting, Professional Services, and IT/Data Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Lyft",
+    "aliases": [
+      "Lyft"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Marketplace Operations Analyst",
+      "Strategic Finance Analyst"
+    ],
+    "career_url": "",
+    "category": "Hardware, Consumer Tech, Retail, and Autonomous Systems",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Magnus Technology Solutions",
+    "aliases": [
+      "Magnus Technology Solutions"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Data Management Analyst",
+      "IT Data Analyst"
+    ],
+    "career_url": "",
+    "category": "Consulting, Professional Services, and IT/Data Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Maxim Healthcare",
+    "aliases": [
+      "Maxim Healthcare"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Healthcare Administration Analyst",
+      "Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Healthcare, Biotechnology, and Life Sciences",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "McKinsey & Company",
+    "aliases": [
+      "McKinsey & Company"
+    ],
+    "location": "San Francisco, Palo Alto",
+    "roles": [
+      "Advanced Analytics Associate",
+      "Business Analyst"
+    ],
+    "career_url": "",
+    "category": "Consulting, Professional Services, and IT/Data Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Meta",
+    "aliases": [
+      "Meta"
+    ],
+    "location": "Menlo Park, San Francisco",
+    "roles": [
+      "BizOps Analyst",
+      "Data Analyst",
+      "Product Analyst"
+    ],
+    "career_url": "",
+    "category": "Mega-Cap Technology and Cloud Infrastructure",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Netflix",
+    "aliases": [
+      "Netflix"
+    ],
+    "location": "Los Gatos",
+    "roles": [
+      "Content Data Analyst",
+      "Financial Analyst",
+      "Product Analyst"
+    ],
+    "career_url": "",
+    "category": "Mega-Cap Technology and Cloud Infrastructure",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Neuralink",
+    "aliases": [
+      "Neuralink"
+    ],
+    "location": "South San Francisco",
+    "roles": [
+      "Systems Data Analyst",
+      "Technical Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Hardware, Consumer Tech, Retail, and Autonomous Systems",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "North East Medical Services",
+    "aliases": [
+      "North East Medical Services"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Epic Application Analyst",
+      "Healthcare Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Healthcare, Biotechnology, and Life Sciences",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Nvidia",
+    "aliases": [
+      "Nvidia"
+    ],
+    "location": "Santa Clara",
+    "roles": [
+      "Business Operations Analyst",
+      "Data Analyst",
+      "Financial Analyst"
+    ],
+    "career_url": "",
+    "category": "Hardware, Consumer Tech, Retail, and Autonomous Systems",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Okta",
+    "aliases": [
+      "Okta"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Business Systems Analyst",
+      "Data Analyst",
+      "RevOps Analyst"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Oracle",
+    "aliases": [
+      "Oracle"
+    ],
+    "location": "Redwood City, Santa Clara",
+    "roles": [
+      "Business Analyst",
+      "Financial Analyst",
+      "Systems Analyst"
+    ],
+    "career_url": "",
+    "category": "Mega-Cap Technology and Cloud Infrastructure",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Pacific Life",
+    "aliases": [
+      "Pacific Life"
+    ],
+    "location": "San Jose",
+    "roles": [
+      "Risk Analyst",
+      "Senior Systems Analyst"
+    ],
+    "career_url": "",
+    "category": "Healthcare, Biotechnology, and Life Sciences",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Palo Alto Networks",
+    "aliases": [
+      "Palo Alto Networks"
+    ],
+    "location": "Santa Clara",
+    "roles": [
+      "Business Operations Analyst",
+      "Cyber Data Analyst",
+      "Sales Ops Analyst"
+    ],
+    "career_url": "",
+    "category": "Mega-Cap Technology and Cloud Infrastructure",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "PayPal",
+    "aliases": [
+      "PayPal"
+    ],
+    "location": "San Jose",
+    "roles": [
+      "Data Analyst",
+      "Product Analyst",
+      "Risk Analyst"
+    ],
+    "career_url": "",
+    "category": "Financial Technology and Financial Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Plaid",
+    "aliases": [
+      "Plaid"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Business Operations Analyst",
+      "Data Analyst",
+      "Strategic Finance Analyst"
+    ],
+    "career_url": "",
+    "category": "Financial Technology and Financial Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Protiviti",
+    "aliases": [
+      "Protiviti"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Business Intelligence Analyst",
+      "Risk & Compliance Analyst"
+    ],
+    "career_url": "",
+    "category": "Consulting, Professional Services, and IT/Data Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Ripple",
+    "aliases": [
+      "Ripple"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Compliance Operations Analyst",
+      "Strategic Finance Analyst"
+    ],
+    "career_url": "",
+    "category": "Financial Technology and Financial Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Robinhood",
+    "aliases": [
+      "Robinhood"
+    ],
+    "location": "Menlo Park",
+    "roles": [
+      "Compliance Analyst",
+      "Data Analyst",
+      "Strategic Finance Analyst"
+    ],
+    "career_url": "",
+    "category": "Financial Technology and Financial Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Roux Associates",
+    "aliases": [
+      "Roux Associates"
+    ],
+    "location": "Oakland",
+    "roles": [
+      "Environmental Data Analyst",
+      "GIS Analyst"
+    ],
+    "career_url": "",
+    "category": "Consulting, Professional Services, and IT/Data Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Sajix Software Solution",
+    "aliases": [
+      "Sajix Software Solution"
+    ],
+    "location": "Pleasanton",
+    "roles": [
+      "Healthcare Systems Analyst",
+      "Trainee Data Analyst"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Salesforce",
+    "aliases": [
+      "Salesforce"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Business Analyst",
+      "Data Analyst",
+      "RevOps Analyst"
+    ],
+    "career_url": "",
+    "category": "Mega-Cap Technology and Cloud Infrastructure",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Samsara",
+    "aliases": [
+      "Samsara"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Business Operations Analyst",
+      "Data Analyst",
+      "Legal Analyst"
+    ],
+    "career_url": "",
+    "category": "Hardware, Consumer Tech, Retail, and Autonomous Systems",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Scale AI",
+    "aliases": [
+      "Scale AI"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "AI Data Operations Analyst",
+      "Operations Data Analyst"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "ServiceNow",
+    "aliases": [
+      "ServiceNow"
+    ],
+    "location": "Santa Clara",
+    "roles": [
+      "Business Analyst",
+      "Data Analyst",
+      "Technical Solutions Analyst"
+    ],
+    "career_url": "",
+    "category": "Mega-Cap Technology and Cloud Infrastructure",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Snowflake",
+    "aliases": [
+      "Snowflake"
+    ],
+    "location": "San Mateo",
+    "roles": [
+      "Data Analyst",
+      "Sales Ops Analyst",
+      "Strategic Finance Analyst"
+    ],
+    "career_url": "",
+    "category": "Mega-Cap Technology and Cloud Infrastructure",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "SoFi",
+    "aliases": [
+      "SoFi"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Business Operations Analyst",
+      "Credit Risk Analyst",
+      "Financial Analyst"
+    ],
+    "career_url": "",
+    "category": "Financial Technology and Financial Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Softmax",
+    "aliases": [
+      "Softmax"
+    ],
+    "location": "San Francisco, CA / Remote",
+    "roles": [
+      "Systems Analyst",
+      "Technical"
+    ],
+    "career_url": "",
+    "category": "Specialized Tech Enterprise",
+    "source_tabs": [
+      "Y-Combinator"
+    ],
+    "notes": "TN, E-3, O-1, J-1 (Explicitly NO H-1B)"
+  },
+  {
+    "company_name": "Splunk",
+    "aliases": [
+      "Splunk"
+    ],
+    "location": "San Jose",
+    "roles": [
+      "Business Operations Analyst",
+      "Cyber Data Analyst"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Stripe",
+    "aliases": [
+      "Stripe"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Data Analyst",
+      "Financial Analyst",
+      "Risk & Compliance Analyst"
+    ],
+    "career_url": "",
+    "category": "Financial Technology and Financial Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Sutter Health",
+    "aliases": [
+      "Sutter Health"
+    ],
+    "location": "San Francisco, Emeryville",
+    "roles": [
+      "Financial Analyst",
+      "Healthcare Systems Analyst",
+      "Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Healthcare, Biotechnology, and Life Sciences",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Tata Consultancy Services",
+    "aliases": [
+      "Tata Consultancy Services"
+    ],
+    "location": "Sunnyvale",
+    "roles": [
+      "Business Systems Analyst",
+      "Technical Solutions Consultant"
+    ],
+    "career_url": "",
+    "category": "Consulting, Professional Services, and IT/Data Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Tesla",
+    "aliases": [
+      "Tesla"
+    ],
+    "location": "Fremont, Palo Alto",
+    "roles": [
+      "Data Analyst",
+      "Manufacturing Operations Analyst",
+      "Supply Chain Analyst"
+    ],
+    "career_url": "",
+    "category": "Hardware, Consumer Tech, Retail, and Autonomous Systems",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "The Clorox Company",
+    "aliases": [
+      "The Clorox Company"
+    ],
+    "location": "Oakland",
+    "roles": [
+      "Brand Data Analyst",
+      "Financial Analyst",
+      "Supply Chain Analyst"
+    ],
+    "career_url": "",
+    "category": "Hardware, Consumer Tech, Retail, and Autonomous Systems",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Thinking Machines",
+    "aliases": [
+      "Thinking Machines"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Data Infrastructure Analyst",
+      "ML Data Analyst"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Twilio",
+    "aliases": [
+      "Twilio"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Business Analyst",
+      "Data Analyst",
+      "Financial Analyst"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Uber",
+    "aliases": [
+      "Uber"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Data Analyst",
+      "Product Analyst",
+      "Strategic Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Hardware, Consumer Tech, Retail, and Autonomous Systems",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "UC San Francisco (UCSF)",
+    "aliases": [
+      "UC San Francisco (UCSF)"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Assistant Specialist Data Analyst",
+      "Clinical Research Analyst",
+      "Junior"
+    ],
+    "career_url": "",
+    "category": "Healthcare, Biotechnology, and Life Sciences",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Verdantas",
+    "aliases": [
+      "Verdantas"
+    ],
+    "location": "San Ramon",
+    "roles": [
+      "Environmental Data Analyst",
+      "Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Consulting, Professional Services, and IT/Data Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Visa",
+    "aliases": [
+      "Visa"
+    ],
+    "location": "San Francisco, Foster City",
+    "roles": [
+      "Data Analyst",
+      "Financial Analyst",
+      "Payment Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Financial Technology and Financial Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Wells Fargo",
+    "aliases": [
+      "Wells Fargo"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Business Data Analyst",
+      "Credit Risk Analyst",
+      "Financial Analyst"
+    ],
+    "career_url": "",
+    "category": "Financial Technology and Financial Services",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Williams-Sonoma",
+    "aliases": [
+      "Williams-Sonoma"
+    ],
+    "location": "San Francisco",
+    "roles": [
+      "Retail Data Analyst",
+      "Supply Chain Operations Analyst"
+    ],
+    "career_url": "",
+    "category": "Hardware, Consumer Tech, Retail, and Autonomous Systems",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Wordware",
+    "aliases": [
+      "Wordware",
+      "Wordware (Sauna)"
+    ],
+    "location": "San Francisco | San Francisco, CA (Presidio Onsite)",
+    "roles": [
+      "AI Systems Analyst",
+      "Business Analyst",
+      "Operations Specialist",
+      "Ops Analyst",
+      "Strategic Business"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups | YC Backed ($30M Seed)",
+    "source_tabs": [
+      "Bay Area Companies",
+      "Y-Combinator"
+    ],
+    "notes": "O-1 and J-1 Sponsorship for Top Candidates"
+  },
+  {
+    "company_name": "Workday",
+    "aliases": [
+      "Workday"
+    ],
+    "location": "Pleasanton",
+    "roles": [
+      "Business Analyst",
+      "Financial Analyst",
+      "HRIS Technical Analyst"
+    ],
+    "career_url": "",
+    "category": "Mega-Cap Technology and Cloud Infrastructure",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  },
+  {
+    "company_name": "Y Combinator HQ",
+    "aliases": [
+      "Y Combinator HQ"
+    ],
+    "location": "Remote (US) / SF HQ",
+    "roles": [
+      "Legal Analyst (2-Yr Track)"
+    ],
+    "career_url": "",
+    "category": "Venture Accelerator (Internal)",
+    "source_tabs": [
+      "Y-Combinator"
+    ],
+    "notes": "NO Visa Sponsorship (US Auth Required)"
+  },
+  {
+    "company_name": "Zoom Communications",
+    "aliases": [
+      "Zoom Communications"
+    ],
+    "location": "San Jose",
+    "roles": [
+      "Business Operations Analyst",
+      "Data Analyst",
+      "Financial Analyst"
+    ],
+    "career_url": "",
+    "category": "Enterprise Software, SaaS, and AI Startups",
+    "source_tabs": [
+      "Bay Area Companies"
+    ],
+    "notes": ""
+  }
+]
