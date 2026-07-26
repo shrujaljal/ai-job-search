@@ -686,6 +686,28 @@ def job_keys(job: dict) -> tuple[str, str]:
     )
 
 
+def tailoring_payload(job: dict) -> dict:
+    """Map a persisted target-company job to the resume-tailoring contract."""
+    try:
+        sources = json.loads(job.get("sources_json") or "[]")
+    except (TypeError, json.JSONDecodeError):
+        sources = []
+    source_names = [str(source) for source in sources]
+    board = "LinkedIn" if any(
+        source.casefold() == "linkedin" for source in source_names
+    ) else ""
+    return {
+        "title": str(job.get("title") or ""),
+        "company": str(job.get("company_name") or ""),
+        "location": str(job.get("location") or ""),
+        "url": str(job.get("canonical_url") or ""),
+        "board": board,
+        "id": str(job.get("provider_id") or job.get("canonical_url") or ""),
+        "jd_text": str(job.get("description") or ""),
+        "job_key": str(job.get("job_key") or ""),
+    }
+
+
 class _JobLinkParser(HTMLParser):
     def __init__(self, base_url: str):
         super().__init__()
@@ -1003,6 +1025,22 @@ def finish_search_run(
                 jobs_found, jobs_new, run_id,
             ),
         )
+
+
+def latest_search_run_id(
+    db_path: Path | str = DEFAULT_DB,
+) -> int | None:
+    """Return the newest completed target-company search run."""
+    with _connect(db_path) as connection:
+        row = connection.execute(
+            """
+            SELECT id FROM search_runs
+            WHERE finished_at IS NOT NULL
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+    return int(row["id"]) if row else None
 
 
 def run_jobs(

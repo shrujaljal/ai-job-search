@@ -12,12 +12,14 @@ from target_companies import (
     import_records,
     initialize_database,
     fetch_career_jobs,
+    latest_search_run_id,
     list_companies,
     record_job,
     role_match_score,
     run_jobs,
     SEED_FILE,
     start_search_run,
+    tailoring_payload,
 )
 
 
@@ -142,6 +144,7 @@ class TargetCompanyTests(unittest.TestCase):
             )
             self.assertFalse(is_new_again)
             finish_search_run(run_one, 1, 0, 1, 1, db)
+            self.assertEqual(run_one, latest_search_run_id(db))
             self.assertEqual(1, len(run_jobs(run_one, new_only=True, db_path=db)))
 
             run_two = start_search_run("", "any", ["LinkedIn"], 1, db)
@@ -150,6 +153,7 @@ class TargetCompanyTests(unittest.TestCase):
             )
             self.assertFalse(tomorrow_new)
             finish_search_run(run_two, 1, 0, 1, 0, db)
+            self.assertEqual(run_two, latest_search_run_id(db))
             self.assertEqual([], run_jobs(run_two, new_only=True, db_path=db))
             self.assertEqual(1, len(run_jobs(run_two, db_path=db)))
 
@@ -176,6 +180,34 @@ class TargetCompanyTests(unittest.TestCase):
         self.assertEqual(1, len(jobs))
         self.assertEqual("123", jobs[0]["id"])
         self.assertEqual("Business Operations Analyst", jobs[0]["title"])
+
+    def test_seen_job_maps_to_tailoring_contract(self):
+        linked_in = tailoring_payload({
+            "title": "Strategy & Operations Analyst",
+            "company_name": "Example",
+            "location": "San Francisco, CA",
+            "canonical_url": "https://linkedin.com/jobs/view/123",
+            "provider_id": "123",
+            "description": "",
+            "sources_json": '["LinkedIn"]',
+            "job_key": "job-123",
+        })
+        self.assertEqual("LinkedIn", linked_in["board"])
+        self.assertEqual("123", linked_in["id"])
+        self.assertEqual("Example", linked_in["company"])
+        self.assertEqual("job-123", linked_in["job_key"])
+
+        career_site = tailoring_payload({
+            "title": "Business Analyst",
+            "company_name": "Example",
+            "canonical_url": "https://example.com/jobs/9",
+            "description": "Analyze operating metrics.",
+            "sources_json": '["Greenhouse"]',
+        })
+        self.assertEqual("", career_site["board"])
+        self.assertEqual(
+            "Analyze operating metrics.", career_site["jd_text"]
+        )
 
 
 if __name__ == "__main__":

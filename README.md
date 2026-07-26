@@ -24,8 +24,10 @@ your computer.
 - **🎯 Target Companies** — manage the priority-company catalog, merge updates
   from Excel, add career-site links, and run a thorough search across every
   active company and its broad target-role matches. Previously seen and applied
-  jobs are remembered so they are not repeatedly presented as new.
-- **🔍 Search & Tailor** — search LinkedIn (and Indeed/Glassdoor when reachable) for
+  jobs are remembered so they are not repeatedly presented as new. Select row
+  ranges or cell ranges to batch-add jobs to the tracker or generate tailored
+  resumes.
+- **🔍 Search & Tailor** — search LinkedIn for
   several target roles at once. Each posting's full description is read and scored
   against the candidate profile, then flagged for experience level and visa
   sponsorship. Queue the good ones and generate tailored resumes in one click.
@@ -81,7 +83,7 @@ To stop the app, close that console window.
 | `target_companies.py` | Imports and merges target companies, stores search history in SQLite, matches broad role families, deduplicates jobs, and reads supported career sites. |
 | `data/target_companies_seed.json` | The initial 97-company catalog built from the two uploaded Excel tabs. |
 | `resume_engine/` | Builds the Word résumé from structured data. `profile.py` holds the base résumé and per-role-family variants; `generator.py` writes the DOCX; `content_rules.py` keeps it to one page. |
-| `.agents/skills/*/cli` | The TypeScript (Bun) scrapers for LinkedIn, Indeed, Glassdoor. |
+| `.agents/skills/linkedin-search/cli` | The TypeScript (Bun) scraper for LinkedIn. |
 | `setup.ps1` | One-command environment setup + shortcut creation. |
 | `Job Application Agent.bat` | The double-click launcher (runs the app from `.venv`). |
 | `assets/` | Icon generator and desktop/Start-Menu shortcut script. |
@@ -137,8 +139,8 @@ from loading the scraper before the job-board request was made.
   "must be a U.S. citizen" roles are caught before you waste effort on them.
 - **Sponsorship-aware:** roles that block visa sponsorship are flagged or skipped,
   because the candidate is an F1 student who needs sponsorship.
-- **Indeed & Glassdoor** sit behind Cloudflare and often refuse automated requests;
-  the app degrades gracefully and leans on LinkedIn (which exposes a guest API).
+- **LinkedIn is the only general job board searched.** Indeed and Glassdoor were
+  removed from the app because their automated requests were consistently blocked.
 - **Direct career sites are explicit about coverage:** Greenhouse, Lever, and
   SmartRecruiters use their public posting APIs; other career pages use a
   best-effort link reader and are marked unsupported or failed when their jobs

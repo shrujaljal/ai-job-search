@@ -5,7 +5,7 @@ Tabs:
   1. Dashboard       — job-search progress with filters and visuals.
   2. Tracker         — track application status.
   3. Target Companies — manage priority employers and exhaustive search history.
-  4. Search & Tailor — scrape job boards, score each job against the profile,
+  4. Search & Tailor — search LinkedIn, score each job against the profile,
      queue jobs, and generate tailored resumes.
   5. Paste JD        — tailor a resume from pasted JD text or a job URL.
 """
@@ -34,6 +34,7 @@ from target_companies import (
     import_records,
     initialize_database,
     job_keys,
+    latest_search_run_id,
     list_companies,
     record_job,
     records_from_workbook,
@@ -42,6 +43,7 @@ from target_companies import (
     save_company,
     split_target_roles,
     start_search_run,
+    tailoring_payload,
     update_company_search_status,
 )
 
@@ -52,10 +54,7 @@ STATUSES = ["To Apply", "Applied", "Phone Screen", "Interview",
 ROOT = Path(__file__).parent
 CLI_ROOTS = {
     "LinkedIn":  ROOT / ".agents/skills/linkedin-search/cli",
-    "Indeed":    ROOT / ".agents/skills/indeed-search/cli",
-    "Glassdoor": ROOT / ".agents/skills/glassdoor-search/cli",
 }
-ALL_BOARDS = list(CLI_ROOTS.keys())
 TRACKER_FILE = ROOT / "output" / "tracker.json"
 OUTPUT_DIR = ROOT / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
@@ -226,12 +225,17 @@ def render_result(r: dict, key_prefix: str) -> None:
                         mime="application/pdf", key=f"{key_prefix}_pdf")
 
         if tracker_entry(
-            company, role, r.get("location", ""), r.get("url", "")
+            company, role, r.get("location", ""), r.get("url", ""),
+            r.get("job_key", ""),
         ):
             st.success("✓ In tracker")
         elif st.button("➕ Add to Tracker", key=f"{key_prefix}_trk"):
-            add_application(company, role, r.get("location", ""), r.get("url", ""),
-                            status="To Apply", notes=f"Resume tailored ({r.get('family', '')})")
+            add_application(
+                company, role, r.get("location", ""), r.get("url", ""),
+                status="To Apply",
+                notes=f"Resume tailored ({r.get('family', '')})",
+                job_key=r.get("job_key", ""),
+            )
             st.rerun()
 
 
@@ -367,7 +371,7 @@ def run_search(boards: list[str], queries: list[str], location: str,
     seen = set()
     board_status = {}
     n_tasks = max(1, len(boards) * len(queries))
-    progress = st.progress(0.0, text="Searching boards…")
+    progress = st.progress(0.0, text="Searching LinkedIn...")
     task = 0
     for board in boards:
         statuses = []
@@ -765,8 +769,8 @@ def render_target_companies_tab() -> None:
     st.subheader("Brute-Force Search")
     st.caption(
         "Searches every active target company and every saved role. Career "
-        "sites are checked when a URL is available; selected job boards provide "
-        "coverage for the rest."
+        "sites are checked when a URL is available; LinkedIn provides coverage "
+        "for the rest."
     )
     st.caption(
         "Status meanings: ok = search executed; empty = executed with no "
@@ -801,14 +805,14 @@ def render_target_companies_tab() -> None:
             key="target_job_type",
         )
     with right:
-        boards = st.multiselect(
-            "Supplementary job boards",
-            ALL_BOARDS,
-            default=ALL_BOARDS,
-            key="target_boards",
+        search_linkedin = st.checkbox(
+            "Search LinkedIn",
+            value=True,
+            key="target_search_linkedin",
         )
+        boards = ["LinkedIn"] if search_linkedin else []
         pages = st.number_input(
-            "Pages per role and board",
+            "LinkedIn pages per role",
             min_value=1,
             max_value=5,
             value=1,
@@ -820,7 +824,7 @@ def render_target_companies_tab() -> None:
             max_value=6,
             value=3,
             key="target_workers",
-            help="Lower this if a job board begins rate-limiting searches.",
+            help="Lower this if LinkedIn begins rate-limiting searches.",
         )
         use_career_sites = st.checkbox(
             "Search saved career websites",
@@ -851,10 +855,10 @@ def render_target_companies_tab() -> None:
     if test_runtime:
         runtime_errors = validate_scraper_runtime(boards)
         if runtime_errors:
-            st.error("One or more selected job-board scrapers cannot run.")
+            st.error("The LinkedIn scraper cannot run.")
             st.code("\n".join(runtime_errors), language=None)
         else:
-            st.success("Bun and all selected job-board scrapers are ready.")
+            st.success("Bun and the LinkedIn scraper are ready.")
 
     if start_search:
         runtime_errors = validate_scraper_runtime(boards)
@@ -877,6 +881,7 @@ def render_target_companies_tab() -> None:
             )
             st.session_state["target_run_id"] = run_id
             st.session_state["target_search_reports"] = reports
+            st.session_state["target_tailor_results"] = []
 
     reports = st.session_state.get("target_search_reports") or []
     if reports:
@@ -915,7 +920,10 @@ def render_target_companies_tab() -> None:
                 "Details": coverage_detail(report),
             } for report in reports]), hide_index=True, use_container_width=True)
 
-    run_id = st.session_state.get("target_run_id")
+    run_id = (
+        st.session_state.get("target_run_id")
+        or latest_search_run_id()
+    )
     if not run_id:
         return
     new_only = st.checkbox(
@@ -941,7 +949,6 @@ def render_target_companies_tab() -> None:
             job["job_key"],
         )
         result_rows.append({
-            "Add": False,
             "Company": job["company_name"],
             "Title": job["title"],
             "Location": job["location"],
@@ -955,15 +962,14 @@ def render_target_companies_tab() -> None:
             "URL": job["canonical_url"],
         })
     results_df = pd.DataFrame(result_rows)
-    edited_results = st.data_editor(
+    selection_event = st.dataframe(
         results_df,
         hide_index=True,
         use_container_width=True,
         height=460,
+        on_select="rerun",
+        selection_mode=["multi-row", "multi-cell"],
         column_config={
-            "Add": st.column_config.CheckboxColumn(
-                "Add to Tracker", width="small"
-            ),
             "Company": st.column_config.TextColumn("Company", width="small"),
             "Title": st.column_config.TextColumn("Title", width="medium"),
             "Location": st.column_config.TextColumn("Location", width="small"),
@@ -981,18 +987,30 @@ def render_target_companies_tab() -> None:
                 "Job Posting", width="large", display_text="Open"
             ),
         },
-        disabled=[
-            "Company", "Title", "Location", "Matched Target Role",
-            "Application", "Source", "First Seen", "URL",
-        ],
-        key="target_job_results",
+        key=f"target_job_results_{run_id}_{int(new_only)}",
     )
-    selected = edited_results.index[edited_results["Add"]].tolist()
-    if st.button(
-        f"Add Selected to Tracker ({len(selected)})",
-        disabled=not selected,
-        key="add_target_jobs_to_tracker",
-    ):
+    selected = set(selection_event.selection.rows)
+    selected.update(
+        int(cell[0]) for cell in selection_event.selection.cells
+    )
+    selected = sorted(index for index in selected if 0 <= index < len(jobs))
+
+    tracker_column, tailor_column = st.columns(2)
+    with tracker_column:
+        add_to_tracker = st.button(
+            f"Add Selected to Tracker ({len(selected)})",
+            disabled=not selected,
+            key="add_target_jobs_to_tracker",
+        )
+    with tailor_column:
+        tailor_selected = st.button(
+            f"Tailor Selected Resumes ({len(selected)})",
+            type="primary",
+            disabled=not selected,
+            key="tailor_target_jobs",
+        )
+
+    if add_to_tracker:
         added = 0
         for index in selected:
             job = jobs[index]
@@ -1010,6 +1028,34 @@ def render_target_companies_tab() -> None:
             ))
         st.success(f"Added {added} new job(s) to the tracker.")
         st.rerun()
+
+    if tailor_selected:
+        results = []
+        progress = st.progress(0.0, text="Preparing tailored resumes...")
+        for position, index in enumerate(selected, start=1):
+            job = jobs[index]
+            payload = tailoring_payload(job)
+            progress.progress(
+                (position - 1) / len(selected),
+                text=f"Tailoring {position}/{len(selected)}: {job['title'][:50]}",
+            )
+            if not payload["jd_text"] and not payload["board"]:
+                payload["jd_text"] = jd_from_url(payload["url"])
+            result = tailor_job(payload)
+            result["job_key"] = payload["job_key"]
+            results.append(result)
+        progress.progress(1.0, text="Tailored resumes complete.")
+        progress.empty()
+        st.session_state["target_tailor_results"] = results
+
+    target_tailor_results = st.session_state.get("target_tailor_results") or []
+    if target_tailor_results:
+        st.subheader("Tailored Resumes")
+        for index, result in enumerate(target_tailor_results):
+            render_result(
+                result,
+                key_prefix=f"target_{run_id}_{index}",
+            )
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -1047,7 +1093,6 @@ with tab_search:
                  "custom keyword and press Enter.")
         location = st.text_input("Location", placeholder="California, USA")
     with c2:
-        board_choice = st.selectbox("Job Board", ["All Boards"] + ALL_BOARDS)
         date_posted = st.selectbox(
             "Date Posted", ["any", "day", "week", "month"],
             format_func=lambda x: {"any": "Any time", "day": "Past 24h",
@@ -1059,7 +1104,7 @@ with tab_search:
             "Job Type", ["any", "fulltime", "internship", "contract"],
             format_func=lambda x: x.title() if x != "any" else "Any")
     with c4:
-        pages = st.number_input("Pages per board", min_value=1, max_value=5, value=1,
+        pages = st.number_input("LinkedIn pages", min_value=1, max_value=5, value=1,
                                 help="Each job's full description is fetched and parsed "
                                      "for the fit score, so more pages = noticeably slower. "
                                      "LinkedIn ~25/pg.")
@@ -1068,14 +1113,14 @@ with tab_search:
         if not queries:
             st.warning("Pick at least one role (or type a custom keyword) to search.")
         else:
-            boards = ALL_BOARDS if board_choice == "All Boards" else [board_choice]
+            boards = ["LinkedIn"]
             with st.spinner("Scraping, reading job descriptions, and scoring…"):
                 jobs, board_status = run_search(boards, queries, location,
                                                 date_posted, job_type, int(pages))
             st.session_state["jobs"] = jobs
             st.session_state["tailor_results"] = []  # clear stale tailored results
 
-            # Per-board status line (honest about Cloudflare-blocked boards)
+            # Per-source status line.
             icons = {"ok": "✅", "blocked": "🚫", "error": "⚠️", "empty": "∅"}
             labels = {"ok": lambda c: f"{c} jobs", "blocked": lambda c: "blocked (Cloudflare)",
                       "error": lambda c: "error", "empty": lambda c: "no results"}
@@ -1088,7 +1133,7 @@ with tab_search:
                 if status["status"] == "error" and status.get("detail")
             ]
             if scraper_errors:
-                st.error("One or more job-board scrapers could not run.")
+                st.error("The LinkedIn scraper could not run.")
                 st.code("\n".join(scraper_errors), language=None)
 
             if jobs:
@@ -1102,12 +1147,8 @@ with tab_search:
                 if n_jd < len(jobs):
                     st.caption("Some descriptions couldn't be fetched — those were "
                                "scored on title/company/location only.")
-                if any(s["status"] == "blocked" for s in board_status.values()):
-                    st.info("Indeed and Glassdoor sit behind Cloudflare and often block "
-                            "automated requests. LinkedIn is the reliable source.")
             else:
-                st.info("No results. LinkedIn is the most reliable board; "
-                        "try different keywords.")
+                st.info("No LinkedIn results. Try different keywords or filters.")
 
     # ── Results table with fit scores + queue checkboxes ─────────────────────
     if "jobs" in st.session_state and st.session_state["jobs"]:
@@ -1242,8 +1283,8 @@ with tab_paste:
     else:
         p_url = st.text_input("Job posting URL", key="paste_url",
                               placeholder="https://…")
-        st.caption("LinkedIn links work best. Some sites (Indeed/Glassdoor and "
-                   "Cloudflare-protected pages) may block reading — paste the text instead.")
+        st.caption("LinkedIn links work best. Some career sites may block "
+                   "automated reading; paste the job description instead.")
 
     if st.button("🎯 Generate Tailored Resume", type="primary", key="paste_generate"):
         if not p_company.strip() or not p_role.strip():

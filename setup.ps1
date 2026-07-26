@@ -68,7 +68,7 @@ if (-not $bun) {
     Write-Host "  Bun is not installed. Install it from https://bun.sh then re-run." -ForegroundColor Red
     Write-Host "  (Scrapers need Bun; the resume generator and UI work without it.)" -ForegroundColor DarkGray
 } else {
-    $scrapers = @("linkedin-search", "indeed-search", "glassdoor-search")
+    $scrapers = @("linkedin-search")
     foreach ($s in $scrapers) {
         $dir = Join-Path $root ".agents\skills\$s\cli"
         if (Test-Path $dir) {

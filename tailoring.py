@@ -23,8 +23,6 @@ from resume_engine import tailor_for_job, generate
 ROOT = Path(__file__).parent
 CLI_ROOTS = {
     "LinkedIn":  ROOT / ".agents/skills/linkedin-search/cli",
-    "Indeed":    ROOT / ".agents/skills/indeed-search/cli",
-    "Glassdoor": ROOT / ".agents/skills/glassdoor-search/cli",
 }
 
 # Tailored resumes are written here as: <Company>/<Role>/<Role>.docx + "Shrujal Agarwal.pdf"
@@ -99,10 +97,6 @@ def jd_from_url(url: str, timeout: int = 30) -> str:
     low = url.lower()
     if "linkedin.com" in low:
         return fetch_jd("LinkedIn", url, timeout)
-    if "indeed.com" in low:
-        return fetch_jd("Indeed", url, timeout)
-    if "glassdoor." in low:
-        return fetch_jd("Glassdoor", url, timeout)
     try:
         req = urllib.request.Request(url, headers={
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
