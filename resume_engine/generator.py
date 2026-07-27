@@ -7,6 +7,7 @@ Section order: summary, experience, education, skills, honors/awards.
 Section headers are bold blue (#2F5496) with a bottom rule.
 """
 
+from copy import deepcopy
 from pathlib import Path
 from docx import Document
 from docx.opc.constants import RELATIONSHIP_TYPE
@@ -475,6 +476,169 @@ def _build_honors_row(table, data: ResumeData, num_id: str) -> None:
 # Public API
 # ════════════════════════════════════════════════════════════════════════════
 
+_SECTION_ROWS = {
+    2: "PROFESSIONAL SUMMARY",
+    4: "EXPERIENCE",
+    15: "EDUCATION",
+    17: "SKILLS",
+    19: "HONORS & AWARDS",
+}
+_EXPERIENCE_ROWS = ((5, 6), (7, 8), (9, 10), (11, 12), (13, 14))
+
+
+def _unique_row_cells(row) -> list:
+    cells = []
+    seen = set()
+    for cell in row.cells:
+        marker = id(cell._tc)
+        if marker not in seen:
+            seen.add(marker)
+            cells.append(cell)
+    return cells
+
+
+def _replace_paragraph_element_text(paragraph, text: str) -> None:
+    prototype_rpr = None
+    for run in paragraph.iter(qn("w:r")):
+        run_rpr = run.find(qn("w:rPr"))
+        if run_rpr is not None:
+            prototype_rpr = deepcopy(run_rpr)
+            break
+
+    for child in list(paragraph):
+        if child.tag != qn("w:pPr"):
+            paragraph.remove(child)
+
+    run = OxmlElement("w:r")
+    run.append(prototype_rpr if prototype_rpr is not None else _rpr(sz=SZ))
+    text_element = OxmlElement("w:t")
+    if text.startswith(" ") or text.endswith(" "):
+        text_element.set(
+            "{http://www.w3.org/XML/1998/namespace}space", "preserve"
+        )
+    text_element.text = text
+    run.append(text_element)
+    paragraph.append(run)
+
+
+def _replace_paragraph_text(paragraph, text: str) -> None:
+    _replace_paragraph_element_text(paragraph._p, text)
+
+
+def _replace_cell_paragraphs(cell, texts: list[str]) -> None:
+    prototypes = [deepcopy(paragraph._p) for paragraph in cell.paragraphs]
+    if not prototypes:
+        prototypes = [_para()]
+
+    for paragraph in list(cell._tc.findall(qn("w:p"))):
+        cell._tc.remove(paragraph)
+
+    for index, text in enumerate(texts):
+        paragraph = deepcopy(prototypes[min(index, len(prototypes) - 1)])
+        _replace_paragraph_element_text(paragraph, text)
+        cell._tc.append(paragraph)
+
+    if not texts:
+        paragraph = deepcopy(prototypes[0])
+        _replace_paragraph_element_text(paragraph, "")
+        cell._tc.append(paragraph)
+
+
+def _replace_skill_paragraph(paragraph, name: str, skills: str) -> None:
+    run_properties = []
+    for run in paragraph.iter(qn("w:r")):
+        run_rpr = run.find(qn("w:rPr"))
+        if run_rpr is not None:
+            run_properties.append(deepcopy(run_rpr))
+
+    for child in list(paragraph):
+        if child.tag != qn("w:pPr"):
+            paragraph.remove(child)
+
+    for index, text in enumerate((f"{name}:", f" {skills}")):
+        run = OxmlElement("w:r")
+        if run_properties:
+            run.append(deepcopy(run_properties[min(index, len(run_properties) - 1)]))
+        else:
+            run.append(_rpr(bold=index == 0, sz=SZ))
+        text_element = OxmlElement("w:t")
+        if text.startswith(" ") or text.endswith(" "):
+            text_element.set(
+                "{http://www.w3.org/XML/1998/namespace}space", "preserve"
+            )
+        text_element.text = text
+        run.append(text_element)
+        paragraph.append(run)
+
+
+def _replace_skills(cell, data: ResumeData) -> None:
+    prototypes = [deepcopy(paragraph._p) for paragraph in cell.paragraphs]
+    if not prototypes:
+        prototypes = [_para(justify=True)]
+
+    for paragraph in list(cell._tc.findall(qn("w:p"))):
+        cell._tc.remove(paragraph)
+
+    for index, category in enumerate(data.skills):
+        paragraph = deepcopy(prototypes[min(index, len(prototypes) - 1)])
+        _replace_skill_paragraph(paragraph, category.name, category.skills)
+        cell._tc.append(paragraph)
+
+
+def _template_whitespace(text: str) -> tuple[str, str]:
+    return text[:len(text) - len(text.lstrip())], text[len(text.rstrip()):]
+
+
+def _validate_template(table) -> None:
+    if len(table.rows) != 21:
+        raise ValueError(
+            f"Resume template must contain 21 rows; found {len(table.rows)}."
+        )
+    for row_index, expected in _SECTION_ROWS.items():
+        actual = table.rows[row_index].cells[0].text.strip()
+        if actual != expected:
+            raise ValueError(
+                f"Resume template row {row_index} must be {expected!r}; "
+                f"found {actual!r}."
+            )
+
+
+def _fill_template(table, data: ResumeData) -> None:
+    """Fill the authoritative template without rebuilding its formatting."""
+    _validate_template(table)
+
+    _replace_paragraph_text(table.rows[0].cells[0].paragraphs[0], data.name)
+    _replace_paragraph_text(table.rows[3].cells[0].paragraphs[0], data.summary)
+
+    for experience, (header_row, bullet_row) in zip(
+        data.experiences, _EXPERIENCE_ROWS
+    ):
+        header_cells = _unique_row_cells(table.rows[header_row])
+        if len(header_cells) != 2:
+            raise ValueError(
+                f"Resume template row {header_row} must contain two unique cells."
+            )
+
+        title_paragraph = header_cells[0].paragraphs[0]
+        date_paragraph = header_cells[1].paragraphs[0]
+        _, title_suffix = _template_whitespace(title_paragraph.text)
+        date_prefix, date_suffix = _template_whitespace(date_paragraph.text)
+        _replace_paragraph_text(
+            title_paragraph,
+            f"{experience.company} | {experience.role}{title_suffix}",
+        )
+        _replace_paragraph_text(
+            date_paragraph,
+            f"{date_prefix}{experience.date}{date_suffix}",
+        )
+
+        bullet_cell = _unique_row_cells(table.rows[bullet_row])[0]
+        _replace_cell_paragraphs(bullet_cell, experience.bullets)
+
+    skills_cell = _unique_row_cells(table.rows[18])[0]
+    _replace_skills(skills_cell, data)
+
+
 def generate(data: ResumeData, output_path: str) -> tuple[str, list[str]]:
     """
     Generate a .docx resume from ResumeData.
@@ -486,49 +650,8 @@ def generate(data: ResumeData, output_path: str) -> tuple[str, list[str]]:
 
     doc = Document(str(TEMPLATE))
 
-    # ── Grab existing relationship IDs for email + LinkedIn hyperlinks ───────
-    # The template already has rId6 = email, rId7 = LinkedIn
-    rel_ids = {
-        "email": _external_rel_id(doc, f"mailto:{data.email}"),
-        "linkedin": _external_rel_id(doc, data.linkedin_url),
-    }
-    if data.portfolio_url:
-        rel_ids["portfolio"] = _external_rel_id(doc, data.portfolio_url)
-    if data.github_url:
-        rel_ids["github"] = _external_rel_id(doc, data.github_url)
-
-    # ── Find the bullet numId used in the template ───────────────────────────
-    # We reuse the existing numbering definition (numId=27 in the template)
-    num_id = "27"
-
-    # ── Clear all existing rows from the table ───────────────────────────────
     table = doc.tables[0]
-    _set_table_geometry(table)
-    tbl = table._tbl
-    for tr in list(tbl.findall(qn("w:tr"))):
-        tbl.remove(tr)
-
-    # ── Rebuild rows in order ────────────────────────────────────────────────
-    _build_header_row(table, data, num_id)
-    _build_contact_row(table, data, rel_ids)
-    _build_section_header(table, "PROFESSIONAL SUMMARY", space_before=120)
-    _build_summary_row(table, data)
-    _build_section_header(table, "EXPERIENCE", space_before=120)
-    for index, exp in enumerate(data.experiences):
-        _build_experience_header(
-            table,
-            exp.company,
-            exp.role,
-            exp.date,
-            space_before=0 if index == 0 else 60,
-        )
-        _build_bullets_row(table, exp.bullets, num_id)
-    _build_section_header(table, "EDUCATION", space_before=120)
-    _build_education_row(table, data)
-    _build_section_header(table, "SKILLS", space_before=120)
-    _build_skills_row(table, data, num_id)
-    _build_section_header(table, "HONORS & AWARDS", space_before=120)
-    _build_honors_row(table, data, num_id)
+    _fill_template(table, data)
 
     doc.save(output_path)
     return output_path, warnings

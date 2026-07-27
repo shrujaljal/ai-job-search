@@ -127,16 +127,56 @@ class CatalogTailoringTests(unittest.TestCase):
                 "SKILLS",
                 "HONORS & AWARDS",
             ],
-            [table.rows[index].cells[0].text for index in (2, 4, 15, 17, 19)],
+            [
+                table.rows[index].cells[0].text.strip()
+                for index in (2, 4, 15, 17, 19)
+            ],
         )
         education = table.rows[16].cells[0].paragraphs
         self.assertEqual(2, len(education))
-        self.assertIn("GPA: 3.8\tJune 2026", education[0].text)
-        self.assertIn("GPA: 3.5\tAug 2023", education[1].text)
+        self.assertIn("GPA: 3.8", education[0].text)
+        self.assertIn("June 2026", education[0].text)
+        self.assertIn("GPA: 3.5", education[1].text)
+        self.assertIn("Aug 2023", education[1].text)
         self.assertIn(
             "Process Mapping, SOPs, Root-Cause Analysis, BRD, FRD",
             table.rows[18].cells[0].text,
         )
+
+        template_table = Document(ROOT / "new_template.docx").tables[0]
+        self.assertEqual(template_table._tbl.tblPr.xml, table._tbl.tblPr.xml)
+        self.assertEqual(template_table._tbl.tblGrid.xml, table._tbl.tblGrid.xml)
+
+        def unique_cells(row):
+            result = []
+            seen = set()
+            for cell in row.cells:
+                marker = id(cell._tc)
+                if marker not in seen:
+                    seen.add(marker)
+                    result.append(cell)
+            return result
+
+        for row_index in range(21):
+            expected_row = template_table.rows[row_index]
+            actual_row = table.rows[row_index]
+            expected_row_properties = (
+                expected_row._tr.trPr.xml if expected_row._tr.trPr is not None else None
+            )
+            actual_row_properties = (
+                actual_row._tr.trPr.xml if actual_row._tr.trPr is not None else None
+            )
+            self.assertEqual(expected_row_properties, actual_row_properties)
+
+            expected_cells = unique_cells(expected_row)
+            actual_cells = unique_cells(actual_row)
+            self.assertEqual(len(expected_cells), len(actual_cells))
+            for expected_cell, actual_cell in zip(expected_cells, actual_cells):
+                self.assertEqual(expected_cell._tc.tcPr.xml, actual_cell._tc.tcPr.xml)
+                self.assertEqual(
+                    [paragraph._p.pPr.xml for paragraph in expected_cell.paragraphs],
+                    [paragraph._p.pPr.xml for paragraph in actual_cell.paragraphs],
+                )
 
 
 if __name__ == "__main__":

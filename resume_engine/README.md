@@ -44,9 +44,10 @@ authoritative Business Analyst reference: 18 bullets across the five
 experiences plus three focused skill lines. Beyond Key is fixed at
 `Jan 2022 – Aug 2022` for every role family.
 
-Replacing the DOCX alone is not enough for a layout change: `generator.py`
-clears and rebuilds the template table programmatically, so section order,
-spacing, and row structure live in code.
+`generator.py` fills the authoritative DOCX table in place. The template owns
+section order, row heights, cell geometry, paragraph spacing, and styling;
+the generator changes only the approved summary, experience titles, dates,
+bullets, and skills.
 
 To tweak how much fits on the page, edit the limits at the top of
 `content_rules.py`.
