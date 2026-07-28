@@ -157,22 +157,79 @@ def extract_min_years(jd_text: str) -> int | None:
     """
     Pull the minimum years-of-experience requirement from a JD.
     Handles '5+ years', '3-5 years', 'minimum of 4 years', 'at least 3 years'.
-    Returns the smallest required number, or None if not stated.
+    For compound hard requirements, returns the highest stated minimum so
+    "5 years overall, including 2 years in analytics" remains a 5-year role.
+    Explicitly preferred/ideal/nice-to-have statements are ignored.
     """
     if not jd_text:
         return None
     text = jd_text.lower()
-    mins = []
-    # "3-5 years", "3 to 5 years"  -> take the low end
-    for m in re.finditer(r"(\d{1,2})\s*(?:-|to|–)\s*(\d{1,2})\s*\+?\s*years?", text):
-        mins.append(int(m.group(1)))
-    # "5+ years", "minimum of 4 years", "at least 3 years", "4 years of"
-    for m in re.finditer(
-        r"(?:minimum(?:\s+of)?|at least|min\.?)?\s*(\d{1,2})\s*\+?\s*years?"
-        r"(?:\s+of)?\s+(?:experience|exp|professional|relevant|industry)", text):
-        mins.append(int(m.group(1)))
-    reasonable = [y for y in mins if 0 < y <= 20]
-    return min(reasonable) if reasonable else None
+    requirements = []
+    masked = list(text)
+    optional_context = re.compile(
+        r"\b(preferred|ideally|ideal|nice to have|bonus|a plus)\b", re.I
+    )
+
+    def is_optional(match: re.Match) -> bool:
+        before = text[max(0, match.start() - 35):match.start()]
+        after = text[match.end():min(len(text), match.end() + 24)]
+        return bool(
+            optional_context.search(before)
+            or re.match(
+                r"^\W*(?:is\s+)?"
+                r"(?:preferred|ideal|nice to have|a plus|bonus)\b",
+                after,
+                re.I,
+            )
+        )
+
+    range_pattern = re.compile(
+        r"(\d{1,2})\s*(?:-|to|–)\s*(\d{1,2})\s*\+?\s*years?"
+        r"(?:['’]|\s)*(?:of\s+)?(?:\w+\s+){0,3}"
+        r"(?:experience|exp|professional|relevant|industry)"
+    )
+    for match in range_pattern.finditer(text):
+        if not is_optional(match):
+            requirements.append(int(match.group(1)))
+        for index in range(match.start(), match.end()):
+            masked[index] = " "
+
+    standalone_pattern = re.compile(
+        r"(?:minimum(?:\s+of)?|at least|min\.?|must have|required)?\s*"
+        r"(\d{1,2})\s*(?:\+|or more)?\s*years?"
+        r"(?:['’]|\s)*(?:of\s+)?(?:\w+\s+){0,3}"
+        r"(?:experience|exp|professional|relevant|industry)"
+    )
+    masked_text = "".join(masked)
+    for match in standalone_pattern.finditer(masked_text):
+        if not is_optional(match):
+            requirements.append(int(match.group(1)))
+
+    # Common qualification phrasing omits the word "experience":
+    # "5+ years in strategy" or "at least 4 years working with SQL".
+    domain_pattern = re.compile(
+        r"(?:(?:minimum(?:\s+of)?|at least|min\.?|must have|required|"
+        r"you (?:have|bring)|possess(?:ing)?)\s*)?"
+        r"(\d{1,2})\s*(\+|or more)?\s*years?"
+        r"\s+(?:working\s+)?(?:in|with|as)\b"
+    )
+    for match in domain_pattern.finditer(masked_text):
+        has_requirement_prefix = bool(
+            re.search(
+                r"(?:minimum|at least|min\.?|must have|required|"
+                r"you (?:have|bring)|possess(?:ing)?)",
+                match.group(0),
+                re.I,
+            )
+        )
+        if (
+            (match.group(2) or has_requirement_prefix)
+            and not is_optional(match)
+        ):
+            requirements.append(int(match.group(1)))
+
+    reasonable = [years for years in requirements if 0 < years <= 20]
+    return max(reasonable) if reasonable else None
 
 
 def _norm(text: str) -> str:

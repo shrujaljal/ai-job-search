@@ -23,10 +23,13 @@ your computer.
   CSV export. Saved to disk so it persists across restarts.
 - **🎯 Target Companies** — manage the priority-company catalog, merge updates
   from Excel, add career-site links, and run a thorough search across every
-  active company and its broad target-role matches. Previously seen and applied
-  jobs are remembered so they are not repeatedly presented as new. Select row
-  ranges or cell ranges to batch-add jobs to the tracker or generate tailored
-  resumes.
+  active company and its broad target-role matches. Full job descriptions are
+  screened for early-career fit: 0–3 years is preferred, 4 years is treated as
+  a stretch, and roles requiring 5+ years are excluded. Previously seen and
+  applied jobs are remembered so they are not repeatedly presented as new.
+  Completed searches and their links remain selectable after restarting the app,
+  while the results control can show 10–100 jobs at a time. Select row ranges or
+  cell ranges to batch-add jobs to the tracker or generate tailored resumes.
 - **🔍 Search & Tailor** — search LinkedIn for
   several target roles at once. Each posting's full description is read and scored
   against the candidate profile, then flagged for experience level and visa

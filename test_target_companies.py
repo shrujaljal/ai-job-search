@@ -8,11 +8,13 @@ from unittest.mock import patch
 
 from target_companies import (
     company_matches,
+    experience_screen,
     finish_search_run,
     import_records,
     initialize_database,
     fetch_career_jobs,
     latest_search_run_id,
+    list_search_runs,
     list_companies,
     record_job,
     role_match_score,
@@ -24,6 +26,49 @@ from target_companies import (
 
 
 class TargetCompanyTests(unittest.TestCase):
+    def test_experience_screen_targets_early_career_roles(self):
+        self.assertEqual(
+            (True, 2, "preferred"),
+            experience_screen("Requires 2-3 years of relevant experience."),
+        )
+        self.assertEqual(
+            (True, 4, "stretch"),
+            experience_screen("Minimum of 4 years of professional experience."),
+        )
+        self.assertEqual(
+            (False, 5, "excluded"),
+            experience_screen("Requires 5+ years of industry experience."),
+        )
+        self.assertEqual(
+            (False, 5, "excluded"),
+            experience_screen("You bring 5+ years in strategy and operations."),
+        )
+        self.assertEqual(
+            (True, 4, "stretch"),
+            experience_screen("At least 4 years working with analytics teams."),
+        )
+        self.assertEqual(
+            (True, 3, "preferred"),
+            experience_screen("Requires 3-5 years of relevant experience."),
+        )
+        self.assertEqual(
+            (False, 5, "excluded"),
+            experience_screen(
+                "Requires 5+ years of professional experience, including "
+                "2 years of analytics experience."
+            ),
+        )
+        self.assertEqual(
+            (True, 2, "preferred"),
+            experience_screen(
+                "Requires 2 years of relevant experience; 5 years preferred."
+            ),
+        )
+        self.assertEqual(
+            (True, None, "not_stated"),
+            experience_screen("Early-career analyst opportunity."),
+        )
+
     def test_seed_contains_every_unique_company(self):
         seed = json.loads(SEED_FILE.read_text(encoding="utf-8"))
         self.assertEqual(97, len(seed))
@@ -156,6 +201,82 @@ class TargetCompanyTests(unittest.TestCase):
             self.assertEqual(run_two, latest_search_run_id(db))
             self.assertEqual([], run_jobs(run_two, new_only=True, db_path=db))
             self.assertEqual(1, len(run_jobs(run_two, db_path=db)))
+
+    def test_saved_run_links_survive_later_searches_and_respect_limit(self):
+        with TemporaryDirectory() as temp:
+            db = Path(temp) / "targets.sqlite3"
+            initialize_database(db, seed_path=Path(temp) / "missing.json")
+            import_records([{
+                "company_name": "Example",
+                "roles": ["Business Analyst"],
+                "aliases": ["Example"],
+                "location": "",
+                "career_url": "",
+                "category": "",
+                "source_tabs": ["Test"],
+                "notes": "",
+            }], db)
+            company = list_companies(db)[0]
+
+            run_one = start_search_run("", "any", ["LinkedIn"], 1, db)
+            jobs = [
+                {
+                    "id": "preferred",
+                    "title": "Business Analyst",
+                    "company": "Example",
+                    "url": "https://example.com/jobs/preferred",
+                    "board": "LinkedIn",
+                    "min_years": 2,
+                    "experience_fit": "preferred",
+                    "fit_score": 75,
+                },
+                {
+                    "id": "stretch",
+                    "title": "Operations Analyst",
+                    "company": "Example",
+                    "url": "https://example.com/jobs/stretch",
+                    "board": "LinkedIn",
+                    "min_years": 4,
+                    "experience_fit": "stretch",
+                    "fit_score": 90,
+                },
+                {
+                    "id": "unknown",
+                    "title": "Strategy Analyst",
+                    "company": "Example",
+                    "url": "https://example.com/jobs/unknown",
+                    "board": "LinkedIn",
+                    "min_years": None,
+                    "experience_fit": "not_stated",
+                    "fit_score": 95,
+                },
+            ]
+            for job in jobs:
+                record_job(run_one, job, company, "Business Analyst", db)
+            finish_search_run(run_one, 1, 0, 3, 3, db)
+
+            limited = run_jobs(run_one, limit=2, db_path=db)
+            self.assertEqual(
+                ["preferred", "stretch"],
+                [job["provider_id"] for job in limited],
+            )
+
+            run_two = start_search_run("", "any", ["LinkedIn"], 1, db)
+            _, is_new = record_job(
+                run_two, jobs[0], company, "Business Analyst", db
+            )
+            self.assertFalse(is_new)
+            finish_search_run(run_two, 1, 0, 1, 0, db)
+
+            self.assertEqual(3, len(run_jobs(run_one, db_path=db)))
+            self.assertEqual(
+                "https://example.com/jobs/preferred",
+                run_jobs(run_one, db_path=db)[0]["canonical_url"],
+            )
+            self.assertEqual(
+                [run_two, run_one],
+                [run["id"] for run in list_search_runs(db_path=db)],
+            )
 
     def test_supported_career_site_api_is_parsed(self):
         response = json.dumps({

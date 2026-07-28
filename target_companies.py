@@ -16,15 +16,30 @@ import unicodedata
 from urllib.parse import parse_qsl, urlencode, urljoin, urlparse, urlunparse
 from urllib.request import Request, urlopen
 
+from fit import MAX_YEARS, extract_min_years
+
 
 ROOT = Path(__file__).parent
 DEFAULT_DB = ROOT / "output" / "target_companies.sqlite3"
 SEED_FILE = ROOT / "data" / "target_companies_seed.json"
+PREFERRED_MAX_YEARS = 3
 
 SENIOR_TITLE_RE = re.compile(
     r"\b(senior|sr\.?|director|head|vice president|vp|principal|chief)\b",
     re.I,
 )
+
+
+def experience_screen(jd_text: str) -> tuple[bool, int | None, str]:
+    """Classify a JD for the candidate's early-career experience target."""
+    min_years = extract_min_years(jd_text)
+    if min_years is None:
+        return True, None, "not_stated"
+    if min_years > MAX_YEARS:
+        return False, min_years, "excluded"
+    if min_years <= PREFERRED_MAX_YEARS:
+        return True, min_years, "preferred"
+    return True, min_years, "stretch"
 
 ROLE_FAMILIES = {
     "analytics": {
@@ -253,7 +268,8 @@ def initialize_database(
                 companies_succeeded INTEGER NOT NULL DEFAULT 0,
                 companies_failed INTEGER NOT NULL DEFAULT 0,
                 jobs_found INTEGER NOT NULL DEFAULT 0,
-                jobs_new INTEGER NOT NULL DEFAULT 0
+                jobs_new INTEGER NOT NULL DEFAULT 0,
+                jobs_excluded_experience INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS seen_jobs (
                 id INTEGER PRIMARY KEY,
@@ -273,6 +289,10 @@ def initialize_database(
                 matched_role TEXT NOT NULL DEFAULT '',
                 date_posted TEXT NOT NULL DEFAULT '',
                 description TEXT NOT NULL DEFAULT '',
+                min_years INTEGER,
+                experience_fit TEXT NOT NULL DEFAULT 'not_stated',
+                fit_score INTEGER NOT NULL DEFAULT 0,
+                fit_reason TEXT NOT NULL DEFAULT '',
                 first_seen TEXT NOT NULL,
                 last_seen TEXT NOT NULL,
                 first_run_id INTEGER REFERENCES search_runs(id),
@@ -283,6 +303,16 @@ def initialize_database(
                 ON seen_jobs(fingerprint);
             CREATE INDEX IF NOT EXISTS idx_seen_jobs_last_run
                 ON seen_jobs(last_run_id);
+            CREATE TABLE IF NOT EXISTS search_run_jobs (
+                run_id INTEGER NOT NULL REFERENCES search_runs(id)
+                    ON DELETE CASCADE,
+                job_id INTEGER NOT NULL REFERENCES seen_jobs(id)
+                    ON DELETE CASCADE,
+                is_new INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY (run_id, job_id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_search_run_jobs_job
+                ON search_run_jobs(job_id);
             """
         )
         columns = {
@@ -292,6 +322,43 @@ def initialize_database(
             connection.execute(
                 "ALTER TABLE seen_jobs ADD COLUMN first_run_id INTEGER"
             )
+        migrations = {
+            "min_years": "ALTER TABLE seen_jobs ADD COLUMN min_years INTEGER",
+            "experience_fit": (
+                "ALTER TABLE seen_jobs ADD COLUMN experience_fit "
+                "TEXT NOT NULL DEFAULT 'not_stated'"
+            ),
+            "fit_score": (
+                "ALTER TABLE seen_jobs ADD COLUMN fit_score "
+                "INTEGER NOT NULL DEFAULT 0"
+            ),
+            "fit_reason": (
+                "ALTER TABLE seen_jobs ADD COLUMN fit_reason "
+                "TEXT NOT NULL DEFAULT ''"
+            ),
+        }
+        for column, statement in migrations.items():
+            if column not in columns:
+                connection.execute(statement)
+
+        run_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info(search_runs)")
+        }
+        if "jobs_excluded_experience" not in run_columns:
+            connection.execute(
+                "ALTER TABLE search_runs ADD COLUMN "
+                "jobs_excluded_experience INTEGER NOT NULL DEFAULT 0"
+            )
+
+        connection.execute(
+            """
+            INSERT OR IGNORE INTO search_run_jobs (run_id, job_id, is_new)
+            SELECT last_run_id, id,
+                   CASE WHEN first_run_id = last_run_id THEN 1 ELSE 0 END
+            FROM seen_jobs
+            WHERE last_run_id IS NOT NULL
+            """
+        )
         count = connection.execute(
             "SELECT COUNT(*) FROM target_companies"
         ).fetchone()[0]
@@ -923,6 +990,10 @@ def record_job(
     today = str(date.today())
     source = str(job.get("source") or job.get("board") or "")
     canonical_url = canonicalize_url(job.get("url", ""))
+    min_years = job.get("min_years")
+    experience_fit = str(job.get("experience_fit") or "not_stated")
+    fit_score = int(job.get("fit_score") or 0)
+    fit_reason = str(job.get("fit_reason") or "")
     with _connect(db_path) as connection:
         existing = connection.execute(
             "SELECT * FROM seen_jobs WHERE job_key = ?", (job_key,)
@@ -948,13 +1019,29 @@ def record_job(
                     sources_json = ?, canonical_url = CASE
                         WHEN canonical_url = '' THEN ? ELSE canonical_url END,
                     description = CASE
-                        WHEN description = '' THEN ? ELSE description END
+                        WHEN description = '' THEN ? ELSE description END,
+                    min_years = ?, experience_fit = ?, fit_score = ?,
+                    fit_reason = ?
                 WHERE id = ?
                 """,
                 (
                     today, run_id, json.dumps(sources, ensure_ascii=False),
                     canonical_url, str(job.get("description") or ""),
+                    min_years, experience_fit, fit_score, fit_reason,
                     existing["id"],
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO search_run_jobs (run_id, job_id, is_new)
+                VALUES (?, ?, ?)
+                ON CONFLICT(run_id, job_id) DO UPDATE SET
+                    is_new = MAX(search_run_jobs.is_new, excluded.is_new)
+                """,
+                (
+                    run_id,
+                    existing["id"],
+                    int(existing["first_run_id"] == run_id),
                 ),
             )
             return int(existing["id"]), False
@@ -966,8 +1053,9 @@ def record_job(
                 company_name, normalized_company, title, normalized_title,
                 location, source, sources_json, matched_company_id,
                 matched_role, date_posted, description, first_seen, last_seen,
+                min_years, experience_fit, fit_score, fit_reason,
                 first_run_id, last_run_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 job_key, fingerprint, str(job.get("id") or ""), canonical_url,
@@ -980,10 +1068,19 @@ def record_job(
                 target_company["id"], matched_role,
                 str(job.get("date_posted") or ""),
                 str(job.get("description") or ""),
-                today, today, run_id, run_id,
+                today, today, min_years, experience_fit, fit_score, fit_reason,
+                run_id, run_id,
             ),
         )
-        return int(cursor.lastrowid), True
+        job_id = int(cursor.lastrowid)
+        connection.execute(
+            """
+            INSERT INTO search_run_jobs (run_id, job_id, is_new)
+            VALUES (?, ?, 1)
+            """,
+            (run_id, job_id),
+        )
+        return job_id, True
 
 
 def update_company_search_status(
@@ -1011,18 +1108,20 @@ def finish_search_run(
     jobs_found: int,
     jobs_new: int,
     db_path: Path | str = DEFAULT_DB,
+    jobs_excluded_experience: int = 0,
 ) -> None:
     with _connect(db_path) as connection:
         connection.execute(
             """
             UPDATE search_runs
             SET finished_at = ?, companies_succeeded = ?,
-                companies_failed = ?, jobs_found = ?, jobs_new = ?
+                companies_failed = ?, jobs_found = ?, jobs_new = ?,
+                jobs_excluded_experience = ?
             WHERE id = ?
             """,
             (
                 _now(), companies_succeeded, companies_failed,
-                jobs_found, jobs_new, run_id,
+                jobs_found, jobs_new, jobs_excluded_experience, run_id,
             ),
         )
 
@@ -1043,23 +1142,57 @@ def latest_search_run_id(
     return int(row["id"]) if row else None
 
 
+def list_search_runs(
+    limit: int = 10,
+    db_path: Path | str = DEFAULT_DB,
+) -> list[dict]:
+    """Return recent completed searches so saved links can be reopened."""
+    initialize_database(db_path)
+    with _connect(db_path) as connection:
+        rows = connection.execute(
+            """
+            SELECT * FROM search_runs
+            WHERE finished_at <> ''
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (max(1, int(limit)),),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def run_jobs(
     run_id: int,
     new_only: bool = False,
+    limit: int | None = None,
     db_path: Path | str = DEFAULT_DB,
 ) -> list[dict]:
     initialize_database(db_path)
-    where = "AND j.first_run_id = ?" if new_only else ""
-    params = (run_id, run_id) if new_only else (run_id,)
+    where = "AND rj.is_new = 1" if new_only else ""
+    limit_clause = "LIMIT ?" if limit is not None else ""
+    params: tuple = (
+        (run_id, max(1, int(limit)))
+        if limit is not None else (run_id,)
+    )
     with _connect(db_path) as connection:
         rows = connection.execute(
             f"""
             SELECT j.*, c.company_name AS target_company
-            FROM seen_jobs j
-            JOIN search_runs r ON r.id = j.last_run_id
+            FROM search_run_jobs rj
+            JOIN seen_jobs j ON j.id = rj.job_id
             LEFT JOIN target_companies c ON c.id = j.matched_company_id
-            WHERE j.last_run_id = ? {where}
-            ORDER BY j.company_name COLLATE NOCASE, j.title COLLATE NOCASE
+            WHERE rj.run_id = ? {where}
+            ORDER BY
+                CASE j.experience_fit
+                    WHEN 'preferred' THEN 0
+                    WHEN 'stretch' THEN 1
+                    ELSE 2
+                END,
+                j.fit_score DESC,
+                CASE WHEN j.min_years IS NULL THEN 99 ELSE j.min_years END,
+                j.company_name COLLATE NOCASE,
+                j.title COLLATE NOCASE
+            {limit_clause}
             """,
             params,
         ).fetchall()

@@ -28,6 +28,7 @@ from target_companies import (
     company_matches,
     database_summary,
     delete_companies,
+    experience_screen,
     fetch_career_jobs,
     finish_search_run,
     geography_matches,
@@ -35,6 +36,7 @@ from target_companies import (
     initialize_database,
     job_keys,
     latest_search_run_id,
+    list_search_runs,
     list_companies,
     record_job,
     records_from_workbook,
@@ -356,8 +358,17 @@ def scrape_board(board: str, query: str, location: str, date_posted: str,
 
 def _fetch_one_jd(job: dict) -> None:
     """Fetch and cache the full JD text on a job dict (in place)."""
-    job["jd_text"] = fetch_jd(job.get("board", ""),
-                              job.get("id") or job.get("url") or "")
+    jd_text = str(job.get("description") or job.get("jd_text") or "")
+    if not jd_text:
+        if job.get("board") == "LinkedIn":
+            jd_text = fetch_jd(
+                "LinkedIn", job.get("id") or job.get("url") or ""
+            )
+        else:
+            jd_text = jd_from_url(job.get("url", ""))
+    job["jd_text"] = jd_text
+    if jd_text:
+        job["description"] = jd_text
 
 
 def run_search(boards: list[str], queries: list[str], location: str,
@@ -498,9 +509,8 @@ def _search_one_target_company(
                     job["query"] = role
                     candidates.append(job)
 
-    kept = []
+    preliminary = []
     seen_fingerprints = set()
-    new_count = 0
     for job in candidates:
         is_direct = job.get("board") == "Career site"
         if not is_direct and not company_matches(job.get("company", ""), company):
@@ -521,7 +531,44 @@ def _search_one_target_company(
         if fingerprint in seen_fingerprints:
             continue
         seen_fingerprints.add(fingerprint)
-        _, is_new = record_job(run_id, job, company, matched_role)
+        preliminary.append(job)
+
+    if preliminary:
+        with ThreadPoolExecutor(max_workers=max(1, workers)) as executor:
+            futures = [
+                executor.submit(_fetch_one_jd, job)
+                for job in preliminary
+            ]
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception:
+                    pass
+
+    kept = []
+    new_count = 0
+    experience_excluded = 0
+    for job in preliminary:
+        eligible, min_years, experience_fit = experience_screen(
+            job.get("jd_text", "")
+        )
+        if not eligible:
+            experience_excluded += 1
+            continue
+
+        fit = score_job(
+            job.get("title", ""),
+            job.get("company", ""),
+            job.get("location", ""),
+            job.get("jd_text", ""),
+        )
+        job["min_years"] = min_years
+        job["experience_fit"] = experience_fit
+        job["fit_score"] = fit["score"]
+        job["fit_reason"] = fit["reason"]
+        _, is_new = record_job(
+            run_id, job, company, job["matched_role"]
+        )
         new_count += int(is_new)
         kept.append(job)
 
@@ -542,6 +589,7 @@ def _search_one_target_company(
         "status": company_status,
         "jobs_found": len(kept),
         "jobs_new": new_count,
+        "jobs_excluded_experience": experience_excluded,
         "sources": source_statuses,
     }
 
@@ -582,8 +630,16 @@ def run_target_company_search(
     failed = len(reports) - succeeded
     jobs_found = sum(report["jobs_found"] for report in reports)
     jobs_new = sum(report["jobs_new"] for report in reports)
+    jobs_excluded_experience = sum(
+        report["jobs_excluded_experience"] for report in reports
+    )
     finish_search_run(
-        run_id, succeeded, failed, jobs_found, jobs_new
+        run_id,
+        succeeded,
+        failed,
+        jobs_found,
+        jobs_new,
+        jobs_excluded_experience=jobs_excluded_experience,
     )
     return run_id, reports
 
@@ -831,6 +887,16 @@ def render_target_companies_tab() -> None:
             value=True,
             key="use_target_career_sites",
         )
+        results_limit = st.selectbox(
+            "Jobs shown at once",
+            [10, 20, 30, 50, 100],
+            index=1,
+            key="target_results_limit",
+            help=(
+                "The search remains exhaustive and saves every accepted job. "
+                "This controls only how many ranked links are shown at once."
+            ),
+        )
 
     active_companies = [
         company for company in companies if company["active"]
@@ -880,6 +946,7 @@ def render_target_companies_tab() -> None:
                 int(workers),
             )
             st.session_state["target_run_id"] = run_id
+            st.session_state["target_saved_run_id"] = run_id
             st.session_state["target_search_reports"] = reports
             st.session_state["target_tailor_results"] = []
 
@@ -887,11 +954,15 @@ def render_target_companies_tab() -> None:
     if reports:
         jobs_found = sum(report["jobs_found"] for report in reports)
         jobs_new = sum(report["jobs_new"] for report in reports)
+        jobs_excluded_experience = sum(
+            report["jobs_excluded_experience"] for report in reports
+        )
         searched_ok = sum(report["status"] == "ok" for report in reports)
         summary_message = (
             f"Search complete: {jobs_new} new jobs, {jobs_found} matching "
             f"jobs found, {searched_ok}/{len(reports)} companies searched "
-            "successfully."
+            f"successfully. Excluded {jobs_excluded_experience} roles requiring "
+            "more than 4 years of experience."
         )
         if searched_ok == len(reports):
             st.success(summary_message)
@@ -917,30 +988,78 @@ def render_target_companies_tab() -> None:
                 "Status": report["status"],
                 "Matching Jobs": report["jobs_found"],
                 "New Jobs": report["jobs_new"],
+                "5+ Years Excluded": report["jobs_excluded_experience"],
                 "Details": coverage_detail(report),
             } for report in reports]), hide_index=True, use_container_width=True)
 
-    run_id = (
+    saved_runs = list_search_runs(limit=20)
+    if not saved_runs:
+        return
+    saved_run_by_id = {int(run["id"]): run for run in saved_runs}
+    saved_run_ids = list(saved_run_by_id)
+    preferred_run_id = (
         st.session_state.get("target_run_id")
         or latest_search_run_id()
+        or saved_run_ids[0]
     )
-    if not run_id:
-        return
+    if st.session_state.get("target_saved_run_id") not in saved_run_by_id:
+        st.session_state["target_saved_run_id"] = (
+            preferred_run_id
+            if preferred_run_id in saved_run_by_id
+            else saved_run_ids[0]
+        )
+
+    run_id = st.selectbox(
+        "Saved search results",
+        saved_run_ids,
+        format_func=lambda value: (
+            f"{saved_run_by_id[value]['started_at'].replace('T', ' ')}"
+            f" · {saved_run_by_id[value]['jobs_found']} jobs"
+            f" · {saved_run_by_id[value]['jobs_excluded_experience']} "
+            "excluded for 5+ years"
+        ),
+        key="target_saved_run_id",
+        help=(
+            "Completed result sets and their job links are saved locally and "
+            "remain available after restarting the app."
+        ),
+    )
     new_only = st.checkbox(
         "Show only jobs discovered for the first time in this search",
         value=True,
         key="target_new_only",
     )
-    jobs = run_jobs(run_id, new_only=new_only)
+    jobs = run_jobs(
+        run_id,
+        new_only=new_only,
+        limit=int(results_limit),
+    )
+    available_count = (
+        saved_run_by_id[run_id]["jobs_new"]
+        if new_only else saved_run_by_id[run_id]["jobs_found"]
+    )
     if not jobs:
         st.info(
             "No jobs match this view. Untick the new-only filter to review "
             "previously seen jobs found again in this search."
         )
         return
+    st.caption(
+        f"Showing {len(jobs)} of {available_count} saved jobs, ranked for "
+        "early-career fit. Change 'Jobs shown at once' to view more."
+    )
 
     result_rows = []
     for job in jobs:
+        if job["experience_fit"] == "preferred":
+            experience_label = (
+                f"{job['min_years']} years · preferred"
+                if job["min_years"] is not None else "Preferred"
+            )
+        elif job["experience_fit"] == "stretch":
+            experience_label = "4 years · stretch"
+        else:
+            experience_label = "Not stated"
         tracker_row = tracker_entry(
             job["company_name"],
             job["title"],
@@ -953,6 +1072,8 @@ def render_target_companies_tab() -> None:
             "Title": job["title"],
             "Location": job["location"],
             "Matched Target Role": job["matched_role"],
+            "Experience": experience_label,
+            "Fit": job["fit_score"],
             "Application": (
                 tracker_row.get("status", "In tracker")
                 if tracker_row else "Not tracked"
@@ -976,6 +1097,12 @@ def render_target_companies_tab() -> None:
             "Matched Target Role": st.column_config.TextColumn(
                 "Matched Role", width="medium"
             ),
+            "Experience": st.column_config.TextColumn(
+                "Experience", width="small"
+            ),
+            "Fit": st.column_config.NumberColumn(
+                "Fit", width="small", format="%d"
+            ),
             "Application": st.column_config.TextColumn(
                 "Application", width="small"
             ),
@@ -987,7 +1114,10 @@ def render_target_companies_tab() -> None:
                 "Job Posting", width="large", display_text="Open"
             ),
         },
-        key=f"target_job_results_{run_id}_{int(new_only)}",
+        key=(
+            f"target_job_results_{run_id}_{int(new_only)}_"
+            f"{int(results_limit)}"
+        ),
     )
     selected = set(selection_event.selection.rows)
     selected.update(
